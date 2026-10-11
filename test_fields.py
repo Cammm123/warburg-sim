@@ -71,6 +71,18 @@ class TestDiffuse(unittest.TestCase):
                 for value in row:
                     self.assertGreaterEqual(value, 0)
 
+    def test_rounding_crumbs_snap_to_zero(self) -> None:
+        # Found by the calibration run: at rate 1 the middle square sends away
+        # everything, and float rounding used to leave about -3.5e-18 behind.
+        f = [[9.196592523769888e-31, 0.0, 0.0],
+             [5.067951222763686e-31, 0.26869184399515444, 4.902799617558136e-31],
+             [2.653069509641705e-31, 0.0, 4.569209446671899e-31]]
+        new = diffuse(f, 1.0)
+        for row in new:
+            for value in row:
+                self.assertGreaterEqual(value, 0.0)
+        self.assertAlmostEqual(total(new), total(f))
+
     def test_evens_out_over_time(self) -> None:
         # After many steps, the spike becomes nearly uniform: 1/25 each.
         f = spike(5, 5, 0, 0)

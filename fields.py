@@ -34,6 +34,8 @@ def diffuse(field: Field, rate: float) -> Field:
         new = old + rate x (kernel applied to the 3x3 neighborhood).
     rate must be between 0 and 1, otherwise a square could send away more than
     it has. Raises ValueError otherwise.
+    The math can't go below 0, but float rounding can leave crumbs like -3e-18
+    when a square sends away everything; those are snapped to 0.
     """
     if not 0 <= rate <= 1:
         raise ValueError("rate must be between 0 and 1")
@@ -50,6 +52,12 @@ def diffuse(field: Field, rate: float) -> Field:
                         moved = rate * KERNEL[dr + 1][dc + 1] * field[r][c]
                         new[r][c] -= moved
                         new[nr][nc] += moved
+    for row in new:
+        for c, value in enumerate(row):
+            if value < 0:
+                if value < -1e-9:
+                    raise ValueError(f"diffusion produced {value}; this should be impossible")
+                row[c] = 0.0
     return new
 
 

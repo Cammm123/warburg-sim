@@ -55,10 +55,13 @@ def cell_fate(cell: Cell, cell_atp: float, lactate: float,
     return STAY
 
 
-def metabolism(grid: Grid) -> tuple[Field, Field, Field, Field]:
+def metabolism(grid: Grid, fraction: float = 1.0) -> tuple[Field, Field, Field, Field]:
     """
     Every living cell runs solve_cell on its own square's glucose and O2.
     Glucose taken in is also capped by the cell's glucose_uptake.
+    fraction (0 to 1] is how much of a full step this covers: uptake and mito
+    capacity are scaled by it, so k calls with fraction 1/k add up to one step
+    when supply is plentiful (FBA scales: 1/k of the inputs -> 1/k of the fluxes).
     Returns (atp_made, glucose_change, oxygen_change, lactate_change), each a
     field: ATP per cell, and how each square's chemicals change (used up is
     negative, released is positive). Empty squares make and change nothing.
@@ -73,8 +76,8 @@ def metabolism(grid: Grid) -> tuple[Field, Field, Field, Field]:
             cell = grid.cells[r][c]
             if cell.kind == EMPTY:
                 continue
-            glucose_in = min(cell.glucose_uptake, grid.glucose[r][c])
-            fluxes = solve_cell(glucose_in, grid.oxygen[r][c], cell.mito_capacity)
+            glucose_in = min(cell.glucose_uptake * fraction, grid.glucose[r][c])
+            fluxes = solve_cell(glucose_in, grid.oxygen[r][c], cell.mito_capacity * fraction)
             atp_made[r][c] = atp(fluxes)
             glucose_change[r][c] = -fluxes["v_in"]
             oxygen_change[r][c] = -oxygen_used(fluxes)
@@ -115,31 +118,58 @@ def choose_divisions(cells: list[list[Cell]], dividers: list[tuple[int, int]],
     return winners
 
 
+def refill_vessels(oxygen: Field, glucose: Field, lactate: Field, vessels: list[tuple[int, int]],
+                   params: Params) -> tuple[Field, Field, Field]:
+    """Vessels reset O2 and glucose to blood levels and drain lactate to 0."""
+    return (refill_sources(oxygen, vessels, params.vessel_oxygen),
+            refill_sources(glucose, vessels, params.vessel_glucose),
+            refill_sources(lactate, vessels, 0.0))
+
+
+def capillaries(num_rows: int, num_cols: int, spacing: int) -> list[tuple[int, int]]:
+    """
+    Vessel squares spread evenly, like capillaries: every spacing-th row and
+    column, starting spacing // 2 in from the edge so they sit inside the tissue.
+    """
+    if spacing < 1:
+        raise ValueError("spacing must be at least 1")
+    start = spacing // 2
+    return [(r, c) for r in range(start, num_rows, spacing) for c in range(start, num_cols, spacing)]
+
+
 def step(grid: Grid, params: Params, rng: random.Random) -> Grid:
     """
     One step of the simulation. Returns a new Grid (the input is not changed).
-      1. Vessels refill O2 and glucose and drain lactate.
-      2. Metabolism: each cell runs solve_cell on its square; fields change.
-      3. O2, glucose and lactate diffuse.
+      1-3. Repeated params.diffusion_substeps (k) times, because chemicals
+         move and get used much faster than cells divide:
+           1. Vessels refill O2 and glucose and drain lactate.
+           2. Metabolism: each cell eats uptake_fraction (f) of a full step's
+              appetite (solve_cell on its square); fields change.
+           3. O2, glucose and lactate diffuse.
+         A cell's ATP for its fate = its average ATP rate over the substeps,
+         i.e. (ATP summed over substeps) / (k x f).
       4. Every cell's fate is decided at once (cell_fate, with this step's ATP
          and its square's lactate after diffusion).
       5. Deaths happen, then divisions into empty neighbors (choose_divisions).
     """
-    oxygen = refill_sources(grid.oxygen, grid.vessels, params.vessel_oxygen)
-    glucose = refill_sources(grid.glucose, grid.vessels, params.vessel_glucose)
-    lactate = refill_sources(grid.lactate, grid.vessels, 0.0)
-
-    fed = Grid(grid.cells, oxygen, glucose, lactate, grid.vessels)
-    atp_made, glucose_change, oxygen_change, lactate_change = metabolism(fed)
-    oxygen = apply_change(oxygen, oxygen_change)
-    glucose = apply_change(glucose, glucose_change)
-    lactate = apply_change(lactate, lactate_change)
-
-    oxygen = diffuse(oxygen, params.oxygen_rate)
-    glucose = diffuse(glucose, params.glucose_rate)
-    lactate = diffuse(lactate, params.lactate_rate)
-
     num_rows, num_cols = grid.num_rows(), grid.num_cols()
+    k, f = params.diffusion_substeps, params.uptake_fraction
+    oxygen, glucose, lactate = grid.oxygen, grid.glucose, grid.lactate
+    atp_made = make_field(num_rows, num_cols)
+    for _ in range(k):
+        oxygen, glucose, lactate = refill_vessels(oxygen, glucose, lactate, grid.vessels, params)
+        fed = Grid(grid.cells, oxygen, glucose, lactate, grid.vessels)
+        atp_part, glucose_change, oxygen_change, lactate_change = metabolism(fed, f)
+        atp_made = [[a + b for a, b in zip(ra, rb)] for ra, rb in zip(atp_made, atp_part)]
+        oxygen = apply_change(oxygen, oxygen_change)
+        glucose = apply_change(glucose, glucose_change)
+        lactate = apply_change(lactate, lactate_change)
+        oxygen = diffuse(oxygen, params.oxygen_rate)
+        glucose = diffuse(glucose, params.glucose_rate)
+        lactate = diffuse(lactate, params.lactate_rate)
+
+    atp_made = [[value / (k * f) for value in row] for row in atp_made]
+
     cells = [row[:] for row in grid.cells]
     dividers = []
     for r in range(num_rows):

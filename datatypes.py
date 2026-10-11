@@ -45,7 +45,8 @@ class Params:
     def __init__(self, survive_atp: float = 5.0, divide_atp: float = 20.0,
                  oxygen_rate: float = 1.0, glucose_rate: float = 0.5, lactate_rate: float = 0.5,
                  vessel_oxygen: float = 10.0, vessel_glucose: float = 2.0,
-                 tumor_weight: float = 3.0, healthy_weight: float = 1.0) -> None:
+                 tumor_weight: float = 3.0, healthy_weight: float = 1.0,
+                 diffusion_substeps: int = 1, uptake_fraction: float = 1.0) -> None:
         self.survive_atp = survive_atp          # ATP needed to stay alive
         self.divide_atp = divide_atp            # ATP needed to divide
         self.oxygen_rate = oxygen_rate          # diffusion rates (0 to 1)
@@ -55,6 +56,18 @@ class Params:
         self.vessel_glucose = vessel_glucose
         self.tumor_weight = tumor_weight        # dice weights when cells compete for a square
         self.healthy_weight = healthy_weight
+        # Numerics: each cell step runs this many substeps (refill, eat, diffuse),
+        # and a cell's ATP is its average rate over them. Raise it until results
+        # stop changing (convergence).
+        if diffusion_substeps < 1:
+            raise ValueError("diffusion_substeps must be at least 1")
+        self.diffusion_substeps = diffusion_substeps
+        # Physics: share of a full step's appetite a cell eats per substep, i.e.
+        # how fast cells consume compared with how fast chemicals spread.
+        # Smaller = chemicals reach further before running out.
+        if not 0 < uptake_fraction <= 1:
+            raise ValueError("uptake_fraction must be in (0, 1]")
+        self.uptake_fraction = uptake_fraction
 
 
 class Grid:

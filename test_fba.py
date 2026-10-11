@@ -128,6 +128,15 @@ class TestSolveCell(unittest.TestCase):
                     self.assertLessEqual(oxygen_used(f), o + 1e-12)
                     self.assertLessEqual(f["v_m"], m + 1e-12)
 
+    def test_scaling_inputs_scales_fluxes(self) -> None:
+        # 1/k of every input gives exactly 1/k of every flux: what lets the
+        # grid split a step into k substeps.
+        for g, o, m in [(1, 10, 0.5), (2, 3, 10), (1, 0, 1), (3, 100, 100)]:
+            for k in (2, 4, 10):
+                whole, part = solve_cell(g, o, m), solve_cell(g / k, o / k, m / k)
+                for name in whole:
+                    self.assertAlmostEqual(part[name], whole[name] / k)
+
     def test_more_oxygen_or_capacity_never_lowers_atp(self) -> None:
         # Loosening a limit can only help the best answer.
         values = [0, 0.5, 1, 3, 6, 10]

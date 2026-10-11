@@ -245,11 +245,15 @@ def main() -> None:
     print("Wrote output/diffusion.svg")
 
     print("\nSTEP 5: cell_fate (survive at ATP 5, divide at ATP 20)\n")
-    examples = [("healthy, full respiration", Cell(HEALTHY, 10, 1.0), 32, 0.2),
-                ("healthy, in acid", Cell(HEALTHY, 10, 1.0), 32, 2.0),
-                ("healthy, no O2", Cell(HEALTHY, 10, 1.0), 2, 0.2),
-                ("tumor (Warburg), in acid", Cell(TUMOR, 0.5, 3.0), 9.5, 2.0),
-                ("tumor, double glucose", Cell(TUMOR, 0.5, 3.0), 23, 2.0)]
+    # ATP comes from solve_cell, not typed in: (label, cell, glucose, oxygen, lactate)
+    examples = [("healthy, full respiration", Cell(HEALTHY, 10, 1.0), 1, 10, 0.2),
+                ("healthy, in acid", Cell(HEALTHY, 10, 1.0), 1, 10, 2.0),
+                ("healthy, no O2", Cell(HEALTHY, 10, 1.0), 1, 0, 0.2),
+                ("tumor (Warburg), in acid", Cell(TUMOR, 0.5, 3.0), 1, 10, 2.0),
+                ("tumor, double glucose", Cell(TUMOR, 0.5, 3.0), 2, 10, 2.0),
+                ("tumor, 7x glucose", Cell(TUMOR, 0.5, 3.0), 7, 10, 2.0)]
+    examples = [(label, cell, atp(solve_cell(g, o, cell.mito_capacity)), lac)
+                for label, cell, g, o, lac in examples]
     for label, cell, cell_atp, lac in examples:
         print(f"  {label:<28} ATP {cell_atp:>5g}  lactate {lac:>4g}  ->  {cell_fate(cell, cell_atp, lac, 5, 20)}")
     fate_map_svg(os.path.join("output", "fate_map.svg"), 5, 20)
