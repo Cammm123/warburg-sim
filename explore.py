@@ -5,13 +5,17 @@ Run from this folder:  python3 explore.py
 Steps 1-2: prints S, S v for a few flux vectors, and solve_cell on a few cells,
 and writes output/cell_response.svg (one cell's ATP and lactate vs oxygen).
 Step 4: writes output/diffusion.svg (a spike spreading out, and oxygen from a
-blood vessel being used up by cells). Standard library only.
+blood vessel being used up by cells).
+Step 5: writes output/fate_map.svg (what cell_fate decides for every ATP and
+lactate level, for a healthy and a tumor cell). Standard library only.
 """
 import os
 
 from fba import (METABOLITES, REACTIONS, atp, flux_vector, mat_vec, oxygen_used,
                  solve_cell, stoichiometric_matrix)
 from fields import Field, apply_change, diffuse, make_field, refill_sources, total
+from datatypes import HEALTHY, TUMOR, Cell
+from rules import DIE, DIVIDE, STAY, cell_fate
 
 
 def print_matrix(matrix: list[list[float]]) -> None:
@@ -145,6 +149,42 @@ def diffusion_svg(path: str) -> None:
           f"middle {oxygen[size // 2][size // 2]:.2f}, far edge {bottom:.2f}")
 
 
+def fate_map_svg(path: str, survive_atp: float, divide_atp: float) -> None:
+    """Two panels (healthy, tumor): x = ATP, y = lactate, color = cell_fate's answer."""
+    colors = {DIE: "#E24B4A", STAY: "#B4B2A9", DIVIDE: "#1D9E75"}
+    cells = [("Healthy cell (acid tolerance 1.0)", Cell(HEALTHY, 10, 1.0)),
+             ("Tumor cell (acid tolerance 3.0)", Cell(TUMOR, 0.5, 3.0))]
+    max_atp, max_lac, cols, rows = 35.0, 4.0, 70, 40
+    pw, ph, left, top, gap = 350, 200, 50, 40, 70
+    parts = ['<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 900 330" '
+             'font-family="sans-serif" font-size="12">', '<rect width="100%" height="100%" fill="white"/>']
+    for p, (title, cell) in enumerate(cells):
+        x0 = left + p * (pw + gap)
+        parts.append(f'<text x="{x0}" y="{top - 12}" font-size="14">{title}</text>')
+        for i in range(cols):
+            for j in range(rows):
+                atp_value = (i + 0.5) * max_atp / cols
+                lac_value = (rows - j - 0.5) * max_lac / rows
+                fate = cell_fate(cell, atp_value, lac_value, survive_atp, divide_atp)
+                parts.append(f'<rect x="{x0 + i * pw / cols:.1f}" y="{top + j * ph / rows:.1f}" '
+                             f'width="{pw / cols + 0.3:.1f}" height="{ph / rows + 0.3:.1f}" fill="{colors[fate]}"/>')
+        for a in range(0, 36, 5):
+            parts.append(f'<text x="{x0 + a * pw / max_atp:.1f}" y="{top + ph + 15}" text-anchor="middle">{a}</text>')
+        parts.append(f'<text x="{x0 + pw / 2}" y="{top + ph + 32}" text-anchor="middle">ATP this step</text>')
+        for l in range(0, 5):
+            parts.append(f'<text x="{x0 - 6}" y="{top + ph - l * ph / max_lac + 4:.1f}" text-anchor="end">{l}</text>')
+        parts.append(f'<text x="{x0 - 34}" y="{top + ph / 2}" text-anchor="middle" '
+                     f'transform="rotate(-90 {x0 - 34} {top + ph / 2})">lactate (acid)</text>')
+    for k, (fate, label) in enumerate([(DIE, "die"), (STAY, "stay"), (DIVIDE, "divide")]):
+        parts.append(f'<rect x="{left + k * 90}" y="{top + ph + 50}" width="12" height="12" fill="{colors[fate]}"/>')
+        parts.append(f'<text x="{left + k * 90 + 18}" y="{top + ph + 60}">{label}</text>')
+    parts.append(f'<text x="{left + 300}" y="{top + ph + 60}">survive at ATP {survive_atp:g}, '
+                 f'divide at ATP {divide_atp:g}</text>')
+    parts.append("</svg>")
+    with open(path, "w") as file:
+        file.write("\n".join(parts))
+
+
 def main() -> None:
     print("STEP 1: the stoichiometric matrix S (rows = metabolites, columns = reactions)\n")
     print_matrix(stoichiometric_matrix())
@@ -173,6 +213,17 @@ def main() -> None:
     print("\nSTEP 4: diffusion\n")
     diffusion_svg(os.path.join("output", "diffusion.svg"))
     print("Wrote output/diffusion.svg")
+
+    print("\nSTEP 5: cell_fate (survive at ATP 5, divide at ATP 20)\n")
+    examples = [("healthy, full respiration", Cell(HEALTHY, 10, 1.0), 32, 0.2),
+                ("healthy, in acid", Cell(HEALTHY, 10, 1.0), 32, 2.0),
+                ("healthy, no O2", Cell(HEALTHY, 10, 1.0), 2, 0.2),
+                ("tumor (Warburg), in acid", Cell(TUMOR, 0.5, 3.0), 9.5, 2.0),
+                ("tumor, double glucose", Cell(TUMOR, 0.5, 3.0), 23, 2.0)]
+    for label, cell, cell_atp, lac in examples:
+        print(f"  {label:<28} ATP {cell_atp:>5g}  lactate {lac:>4g}  ->  {cell_fate(cell, cell_atp, lac, 5, 20)}")
+    fate_map_svg(os.path.join("output", "fate_map.svg"), 5, 20)
+    print("Wrote output/fate_map.svg")
 
 
 if __name__ == "__main__":
