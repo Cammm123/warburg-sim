@@ -1,15 +1,17 @@
 """
-Look at what fba.py does, instead of only trusting the tests.
+Look at what the code does, instead of only trusting the tests.
 
 Run from this folder:  python3 explore.py
-Prints S, S v for a few flux vectors, and solve_cell on a few cells, then writes
-output/cell_response.svg: how one cell's ATP and lactate change with oxygen.
-Standard library only.
+Steps 1-2: prints S, S v for a few flux vectors, and solve_cell on a few cells,
+and writes output/cell_response.svg (one cell's ATP and lactate vs oxygen).
+Step 4: writes output/diffusion.svg (a spike spreading out, and oxygen from a
+blood vessel being used up by cells). Standard library only.
 """
 import os
 
 from fba import (METABOLITES, REACTIONS, atp, flux_vector, mat_vec, oxygen_used,
                  solve_cell, stoichiometric_matrix)
+from fields import Field, apply_change, diffuse, make_field, refill_sources, total
 
 
 def print_matrix(matrix: list[list[float]]) -> None:
@@ -82,6 +84,67 @@ def response_svg(path: str) -> None:
         file.write("\n".join(parts))
 
 
+def heatmap_row_svg(frames: list[Field], labels: list[str], top_value: float,
+                    y0: float, title: str) -> list[str]:
+    """SVG pieces for a row of heatmaps: white = 0, dark blue = top_value or more."""
+    square, gap, left = 10, 24, 20
+    parts = [f'<text x="{left}" y="{y0 - 28}" font-size="14">{title}</text>']
+    for i, (field, label) in enumerate(zip(frames, labels)):
+        x0 = left + i * (len(field[0]) * square + gap)
+        parts.append(f'<text x="{x0}" y="{y0 - 8}">{label}</text>')
+        parts.append(f'<rect x="{x0 - 1}" y="{y0 - 1}" width="{len(field[0]) * square + 2}" '
+                     f'height="{len(field) * square + 2}" fill="none" stroke="#999"/>')
+        for r, row in enumerate(field):
+            for c, value in enumerate(row):
+                shade = min(value / top_value, 1.0)
+                red_green = int(255 - 210 * shade)
+                blue = int(255 - 95 * shade)
+                parts.append(f'<rect x="{x0 + c * square}" y="{y0 + r * square}" width="{square}" '
+                             f'height="{square}" fill="rgb({red_green},{red_green},{blue})"/>')
+    return parts
+
+
+def diffusion_svg(path: str) -> None:
+    """Two rows of heatmaps: a spike spreading, then oxygen from a vessel row."""
+    size = 15
+    spike = make_field(size, size)
+    spike[size // 2][size // 2] = 100.0
+    spike_frames, spike_labels = [], []
+    field = spike
+    for step in range(41):
+        if step in (0, 1, 5, 15, 40):
+            spike_frames.append(field)
+            spike_labels.append(f"step {step}, total {total(field):.1f}")
+        field = diffuse(field, 1.0)
+
+    vessels = [(0, c) for c in range(size)]          # blood vessel along the top
+    use_per_square = make_field(size, size, -0.05)   # every cell uses some O2
+    oxygen = make_field(size, size, 0.0)
+    o2_frames, o2_labels = [], []
+    for step in range(301):
+        oxygen = refill_sources(oxygen, vessels, 10.0)
+        if step in (0, 5, 30, 100, 300):
+            o2_frames.append(oxygen)
+            o2_labels.append(f"step {step}")
+        oxygen = diffuse(oxygen, 1.0)
+        usable = [[max(u, -o) for u, o in zip(ur, orow)] for ur, orow in zip(use_per_square, oxygen)]
+        oxygen = apply_change(oxygen, usable)
+
+    parts = ['<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 900 470" '
+             'font-family="sans-serif" font-size="12">', '<rect width="100%" height="100%" fill="white"/>']
+    parts += heatmap_row_svg(spike_frames, spike_labels, 2.0, 60,
+                             "A spike of 100 spreading out (Gray-Scott kernel, rate 1). The total never changes.")
+    parts += heatmap_row_svg(o2_frames, o2_labels, 10.0, 290,
+                             "Oxygen: blood vessel along the top row, every square uses 0.05 per step. "
+                             "Far from the vessel it runs out (hypoxia).")
+    parts.append("</svg>")
+    with open(path, "w") as file:
+        file.write("\n".join(parts))
+    bottom = oxygen[-1][size // 2]
+    print(f"  Oxygen after 300 steps: next to vessel {oxygen[1][size // 2]:.2f}, "
+          f"middle {oxygen[size // 2][size // 2]:.2f}, far edge {bottom:.2f}")
+
+
 def main() -> None:
     print("STEP 1: the stoichiometric matrix S (rows = metabolites, columns = reactions)\n")
     print_matrix(stoichiometric_matrix())
@@ -106,6 +169,10 @@ def main() -> None:
     os.makedirs("output", exist_ok=True)
     response_svg(os.path.join("output", "cell_response.svg"))
     print("\nWrote output/cell_response.svg")
+
+    print("\nSTEP 4: diffusion\n")
+    diffusion_svg(os.path.join("output", "diffusion.svg"))
+    print("Wrote output/diffusion.svg")
 
 
 if __name__ == "__main__":

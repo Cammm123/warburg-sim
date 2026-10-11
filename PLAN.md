@@ -56,7 +56,7 @@ Environment: Homebrew Python 3.14 has no numpy or scipy, so we make `warburg-sim
    - small M gives fermentation even with O₂;
    - the output always satisfies Sv = 0 and every bound.
 3. **LP cross-check:** `solve_cell_lp` agrees with `solve_cell` on a grid of (G, O, M) values. The formula is derived by hand; scipy's general linear-programming solver knows nothing about our derivation. If both give the same optimum on hundreds of inputs, the derivation is right. If they disagree, the test shows exactly which (G, O, M) breaks it.
-4. **Diffusion (Gray–Scott style):** `diffuse` on a single spike spreads it symmetrically and conserves the total away from the edges. `add_sources` and `consume` get their own tests.
+4. **Diffusion (Gray–Scott style):** `diffuse` on a single spike spreads it symmetrically and conserves the total exactly (closed-box edges: a square only sends to neighbors that exist). `add_sources` and `consume` get their own tests.
 5. **Cell rules:** `neighbors` and `cell_fate`, with each threshold tested at, just above and just below it.
 6. **One full step** on a tiny 5×5 grid, checked by hand.
 7. **Render:** SVG frames and an HTML viewer. Then the first real run, about 100×100 with a vessel row along one edge.
