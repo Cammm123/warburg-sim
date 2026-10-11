@@ -85,6 +85,18 @@ def metabolism(grid: Grid, fraction: float = 1.0) -> tuple[Field, Field, Field, 
     return atp_made, glucose_change, oxygen_change, lactate_change
 
 
+def make_daughter(parent: Cell, params: Params, rng: random.Random) -> Cell:
+    """
+    The new cell from a division. Healthy cells copy exactly. Tumor cells
+    (genetically unstable) mutate: mito_capacity + Gaussian noise with standard
+    deviation params.mutation_sd, kept >= 0. Other traits copy exactly.
+    """
+    daughter = daughter_of(parent)
+    if parent.kind == TUMOR and params.mutation_sd > 0:
+        daughter.mito_capacity = max(0.0, parent.mito_capacity + rng.gauss(0.0, params.mutation_sd))
+    return daughter
+
+
 def claim_weight(cell: Cell, params: Params) -> float:
     """A cell's weight on the dice when competing for an empty square."""
     return params.tumor_weight if cell.kind == TUMOR else params.healthy_weight
@@ -150,7 +162,8 @@ def step(grid: Grid, params: Params, rng: random.Random) -> Grid:
          i.e. (ATP summed over substeps) / (k x f).
       4. Every cell's fate is decided at once (cell_fate, with this step's ATP
          and its square's lactate after diffusion).
-      5. Deaths happen, then divisions into empty neighbors (choose_divisions).
+      5. Deaths happen, then divisions into empty neighbors (choose_divisions);
+         tumor daughters mutate (make_daughter).
     """
     num_rows, num_cols = grid.num_rows(), grid.num_cols()
     k, f = params.diffusion_substeps, params.uptake_fraction
@@ -181,7 +194,8 @@ def step(grid: Grid, params: Params, rng: random.Random) -> Grid:
             elif fate == DIVIDE:
                 dividers.append((r, c))
 
-    for (tr, tc), (pr, pc) in choose_divisions(cells, dividers, grid.vessels, params, rng).items():
-        cells[tr][tc] = daughter_of(cells[pr][pc])
+    winners = choose_divisions(cells, dividers, grid.vessels, params, rng)
+    for (tr, tc), (pr, pc) in sorted(winners.items()):
+        cells[tr][tc] = make_daughter(cells[pr][pc], params, rng)
 
     return Grid(cells, oxygen, glucose, lactate, grid.vessels)

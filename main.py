@@ -2,14 +2,19 @@
 Run the Warburg simulation and save pictures.
 
 Run from this folder:  python3 main.py
-Writes output/run1/: viewer.html (open in a browser; Play or drag the slider),
-snapshots at a few steps, and counts.svg (healthy and tumor cells over time).
+Each scenario writes output/<name>/: viewer.html (open in a browser; Play or drag
+the slider), snapshots at a few steps, counts.svg (healthy and tumor cells over
+time) and evolution.svg (mean tumor mito_capacity and Warburg index over time).
+  run1: Warburg tumor seed, no mutation.
+  run2: same, but tumor daughters mutate mito_capacity (sd 0.1): the control
+        experiment for evolution, where mitochondria cost nothing.
 """
 import os
 import random
 import time
 
 from datatypes import HEALTHY, TUMOR, Cell, Grid, Params
+from metrics import summary
 from render import frame_data, grid_svg, line_chart_svg, viewer_html
 from rules import step
 from scenarios import CAPILLARY_SPACING, calibrated_params, healthy_tissue
@@ -42,36 +47,56 @@ def run(grid: Grid, params: Params, steps: int, record_every: int, seed: int,
     return frames, grids
 
 
-def main() -> None:
-    size, steps, record_every, seed = 60, 150, 2, 1
-    params = calibrated_params()
+def run_scenario(name: str, params: Params, steps: int, seed: int = 1, size: int = 60,
+                 record_every: int = 2) -> list[dict]:
+    """Healthy tissue + 3x3 Warburg seed in the middle; run, save pictures, return frames with metrics."""
     grid = healthy_tissue(size, size, CAPILLARY_SPACING, params)
     seed_tumor(grid, size // 2, size // 2, 1, warburg_tumor_cell)
     oxygen_top, lactate_top = params.vessel_oxygen, 4.0
-
-    out_dir = os.path.join("output", "run1")
+    out_dir = os.path.join("output", name)
     os.makedirs(out_dir, exist_ok=True)
+
     started = time.time()
     frames, grids = run(grid, params, steps, record_every, seed, oxygen_top, lactate_top)
-    print(f"Ran {steps} steps on {size}x{size} in {time.time() - started:.0f}s")
+    for frame, snapshot in zip(frames, grids):
+        frame.update(summary(snapshot))
+    print(f"\n{name}: {steps} steps on {size}x{size} in {time.time() - started:.0f}s")
 
     with open(os.path.join(out_dir, "viewer.html"), "w") as file:
-        file.write(viewer_html(frames, size, size, "Warburg simulation, run 1"))
+        file.write(viewer_html(frames, size, size, f"Warburg simulation, {name}"))
     for frame, snapshot in zip(frames, grids):
         if frame["step"] in (0, steps // 3, 2 * steps // 3, steps):
             svg = grid_svg(snapshot, f"step {frame['step']}: {frame['healthy']} healthy, "
                                      f"{frame['tumor']} tumor", oxygen_top, lactate_top, square=5)
             with open(os.path.join(out_dir, f"step_{frame['step']:03d}.svg"), "w") as file:
                 file.write(svg)
-    chart = line_chart_svg({"healthy": [f["healthy"] for f in frames], "tumor": [f["tumor"] for f in frames]},
-                           {"healthy": "#1D9E75", "tumor": "#D85A30"},
-                           "Cells over time (run 1)", "cells", x_step=record_every)
-    with open(os.path.join(out_dir, "counts.svg"), "w") as file:
-        file.write(chart)
+    charts = {
+        "counts.svg": line_chart_svg({"healthy": [f["healthy"] for f in frames],
+                                      "tumor": [f["tumor"] for f in frames]},
+                                     {"healthy": "#1D9E75", "tumor": "#D85A30"},
+                                     f"Cells over time ({name})", "cells", x_step=record_every),
+        "evolution.svg": line_chart_svg({"mean mito capacity": [f["mean_mito"] for f in frames],
+                                         "mean Warburg index": [f["mean_warburg"] for f in frames]},
+                                        {"mean mito capacity": "#534AB7", "mean Warburg index": "#D85A30"},
+                                        f"Tumor traits over time ({name})", "", x_step=record_every),
+    }
+    for filename, chart in charts.items():
+        with open(os.path.join(out_dir, filename), "w") as file:
+            file.write(chart)
 
-    for frame in frames[:: max(1, len(frames) // 10)] + [frames[-1]]:
-        print(f"  step {frame['step']:>3}: {frame['healthy']:>5} healthy, {frame['tumor']:>4} tumor")
-    print(f"Wrote {out_dir}/viewer.html, snapshots and counts.svg")
+    shown = frames[:: max(1, len(frames) // 10)]
+    if shown[-1] is not frames[-1]:
+        shown.append(frames[-1])
+    for frame in shown:
+        print(f"  step {frame['step']:>3}: {frame['healthy']:>5} healthy, {frame['tumor']:>4} tumor, "
+              f"mean M {frame['mean_mito']:.2f}, mean Warburg index {frame['mean_warburg']:.2f}")
+    print(f"  wrote {out_dir}/")
+    return frames
+
+
+def main() -> None:
+    run_scenario("run1", calibrated_params(), steps=150)
+    run_scenario("run2", calibrated_params(mutation_sd=0.1), steps=300)
 
 
 if __name__ == "__main__":

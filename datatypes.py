@@ -46,7 +46,8 @@ class Params:
                  oxygen_rate: float = 1.0, glucose_rate: float = 0.5, lactate_rate: float = 0.5,
                  vessel_oxygen: float = 10.0, vessel_glucose: float = 2.0,
                  tumor_weight: float = 3.0, healthy_weight: float = 1.0,
-                 diffusion_substeps: int = 1, uptake_fraction: float = 1.0) -> None:
+                 diffusion_substeps: int = 1, uptake_fraction: float = 1.0,
+                 mutation_sd: float = 0.0) -> None:
         self.survive_atp = survive_atp          # ATP needed to stay alive
         self.divide_atp = divide_atp            # ATP needed to divide
         self.oxygen_rate = oxygen_rate          # diffusion rates (0 to 1)
@@ -68,6 +69,11 @@ class Params:
         if not 0 < uptake_fraction <= 1:
             raise ValueError("uptake_fraction must be in (0, 1]")
         self.uptake_fraction = uptake_fraction
+        # Evolution: when a tumor cell divides, its daughter's mito_capacity is
+        # the parent's plus random noise with this standard deviation (0 = exact copy).
+        if mutation_sd < 0:
+            raise ValueError("mutation_sd must be >= 0")
+        self.mutation_sd = mutation_sd
 
 
 class Grid:
