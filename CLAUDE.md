@@ -21,4 +21,5 @@ Same as `02-120/spatial-games/CLAUDE.md`:
   (standard library only, like 02-120). `main.py` is the entry point.
 - scipy is used only by the LP cross-check tests, from `.venv/` (git-ignored).
   Setup: `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt`.
-- Run everything from inside this folder: `python3 -m unittest -v`.
+- Run everything from inside this folder: `.venv/bin/python -m unittest -v`
+  (plain `python3` skips the LP tests). `python3 explore.py` prints and draws what fba.py does.
