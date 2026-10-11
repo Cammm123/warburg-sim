@@ -34,7 +34,13 @@ def tumor_warburg_indices(grid: Grid, params: Params | None = None) -> list[floa
     return indices
 
 
+def tumor_markers(grid: Grid) -> list[float]:
+    """The neutral marker of every tumor cell."""
+    return [cell.marker for row in grid.cells for cell in row if cell.kind == TUMOR]
+
+
 def summary(grid: Grid, params: Params | None = None) -> dict[str, float]:
-    """Means over tumor cells (0 if none): mito_capacity, mito_share, Warburg index."""
+    """Means over tumor cells (0 if none): mito_capacity, mito_share, marker, Warburg index."""
     return {"mean_mito": mean(tumor_traits(grid)), "mean_share": mean(tumor_shares(grid)),
+            "mean_marker": mean(tumor_markers(grid)),
             "mean_warburg": mean(tumor_warburg_indices(grid, params))}

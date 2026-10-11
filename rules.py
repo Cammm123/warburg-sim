@@ -111,7 +111,8 @@ def make_daughter(parent: Cell, params: Params, rng: random.Random) -> Cell:
     The new cell from a division. Healthy cells copy exactly. Tumor cells
     (genetically unstable) mutate one trait with Gaussian noise of standard
     deviation params.mutation_sd: mito_share (kept in [0, 1]) for budget cells,
-    otherwise mito_capacity (kept >= 0). Other traits copy exactly.
+    otherwise mito_capacity (kept >= 0). The neutral marker gets its own noise
+    of the same size. Other traits copy exactly.
     """
     daughter = daughter_of(parent)
     if parent.kind == TUMOR and params.mutation_sd > 0:
@@ -120,6 +121,7 @@ def make_daughter(parent: Cell, params: Params, rng: random.Random) -> Cell:
             daughter.mito_share = min(1.0, max(0.0, parent.mito_share + noise))
         else:
             daughter.mito_capacity = max(0.0, parent.mito_capacity + noise)
+        daughter.marker = parent.marker + rng.gauss(0.0, params.mutation_sd)
     return daughter
 
 
@@ -213,7 +215,8 @@ def step(grid: Grid, params: Params, rng: random.Random) -> Grid:
     dividers = []
     for r in range(num_rows):
         for c in range(num_cols):
-            fate = cell_fate(grid.cells[r][c], atp_made[r][c], lactate[r][c],
+            acid = lactate[r][c] if params.acid_harm else 0.0
+            fate = cell_fate(grid.cells[r][c], atp_made[r][c], acid,
                              params.survive_atp, params.divide_atp)
             if fate == DIE:
                 cells[r][c] = empty_cell()

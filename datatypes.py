@@ -18,9 +18,12 @@ class Cell:
     - mito_share: None for a cell with fixed traits (above). A number from 0 to 1
       makes it a budget cell: it splits a protein budget between transporters
       and mitochondria, spending this share on mitochondria (see fba.budget_traits).
+    - marker: a neutral trait that mutates like the real one but does nothing.
+      How far it drifts shows how much a trait changes by chance alone.
     """
     def __init__(self, kind: str, mito_capacity: float = 0.0, acid_tolerance: float = 0.0,
-                 glucose_uptake: float = 1.0, mito_share: float | None = None) -> None:
+                 glucose_uptake: float = 1.0, mito_share: float | None = None,
+                 marker: float = 0.0) -> None:
         if kind not in KINDS:
             raise ValueError(f"kind must be one of {KINDS}, not {kind!r}")
         self.kind = kind
@@ -30,6 +33,7 @@ class Cell:
         if mito_share is not None and not 0 <= mito_share <= 1:
             raise ValueError("mito_share must be between 0 and 1 (or None)")
         self.mito_share = mito_share
+        self.marker = marker
 
     def __repr__(self) -> str:
         share = "" if self.mito_share is None else f", share={self.mito_share:g}"
@@ -45,7 +49,7 @@ def empty_cell() -> Cell:
 def daughter_of(parent: Cell) -> Cell:
     """A new cell with the same traits as its parent (mutation is rules.make_daughter)."""
     return Cell(parent.kind, parent.mito_capacity, parent.acid_tolerance, parent.glucose_uptake,
-                parent.mito_share)
+                parent.mito_share, parent.marker)
 
 
 class Params:
@@ -56,7 +60,7 @@ class Params:
                  tumor_weight: float = 3.0, healthy_weight: float = 1.0,
                  diffusion_substeps: int = 1, uptake_fraction: float = 1.0,
                  mutation_sd: float = 0.0, budget: float = 20.0, mito_cost: float = 10.0,
-                 plastic: bool = False) -> None:
+                 plastic: bool = False, acid_harm: bool = True) -> None:
         self.survive_atp = survive_atp          # ATP needed to stay alive
         self.divide_atp = divide_atp            # ATP needed to divide
         self.oxygen_rate = oxygen_rate          # diffusion rates (0 to 1)
@@ -91,6 +95,8 @@ class Params:
         self.budget = budget
         self.mito_cost = mito_cost
         self.plastic = plastic
+        # Experiment switch: False means lactate never kills anyone.
+        self.acid_harm = acid_harm
 
 
 class Grid:
