@@ -4,7 +4,9 @@ Step 9: experiments. No pictures, several seeds per setting.
 E1  acid harm on vs off, for the free-mitochondria model (trait M) and the
     budget model (trait mito_share). Off = lactate never kills anyone.
 E2  budget model: blood glucose x healthy acid tolerance, to map where
-    fermentation (Warburg) wins.
+    fermentation (Warburg) wins. (A first sweep at glucose 5/10/20 and tolerance
+    1/3/inf was flat: glucose >= 5 is never scarce per substep, and tolerance 3
+    equals the tumor's, so it acts like acid off.)
 Every evolving run also tracks the neutral marker: if the real trait moves much
 more than the marker, that is selection, not chance.
 
@@ -93,8 +95,8 @@ def experiment_2() -> list[str]:
     lines = ["", "## E2: budget model, blood glucose x healthy acid tolerance", "",
              "| blood glucose | healthy acid tolerance | healthy left | tumor | share change | marker change | Warburg index |",
              "|---|---|---|---|---|---|---|"]
-    for glucose in (5.0, 10.0, 20.0):
-        for tolerance in (1.0, 3.0, float("inf")):
+    for glucose in (2.0, 3.0, 5.0):   # below 2, healthy tissue starves on its own
+        for tolerance in (1.0, 2.0):
             params = calibrated_params(mutation_sd=0.05, vessel_glucose=glucose)
             r = run_seeds(params, budget_tumor, healthy_tolerance=tolerance)
             lines.append(f"| {glucose:g} | {tolerance:g} | {fmt(r['healthy'], 0)} | {fmt(r['tumor'], 0)} "

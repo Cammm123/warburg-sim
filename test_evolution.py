@@ -79,6 +79,15 @@ class TestMetrics(unittest.TestCase):
         self.assertAlmostEqual(indices[0], 0.75)
         self.assertAlmostEqual(indices[1], 0.0)
 
+    def test_index_judged_per_substep_like_the_simulation(self) -> None:
+        # Budget cell, share 0.5 (uptake 10, M 1), square glucose 5, O2 10.
+        # Over a whole step glucose would cap uptake (index 0.9); per substep
+        # (fraction 0.02: uptake 0.2, M 0.02) it doesn't: b = 0.01, index 0.95.
+        cells = [[Cell(TUMOR, acid_tolerance=3.0, mito_share=0.5)]]
+        g = Grid(cells, make_field(1, 1, 10.0), make_field(1, 1, 5.0), make_field(1, 1), [])
+        self.assertAlmostEqual(tumor_warburg_indices(g, Params(uptake_fraction=1.0))[0], 0.9)
+        self.assertAlmostEqual(tumor_warburg_indices(g, Params(uptake_fraction=0.02))[0], 0.95)
+
     def test_summary(self) -> None:
         s = summary(self.grid())
         self.assertAlmostEqual(s["mean_mito"], 5.25)

@@ -23,14 +23,17 @@ def tumor_shares(grid: Grid) -> list[float]:
 def tumor_warburg_indices(grid: Grid, params: Params | None = None) -> list[float]:
     """
     Each tumor cell's Warburg index (share of glucose fermented) under the
-    glucose and O2 on its square right now (same rule as metabolism).
+    glucose and O2 on its square right now, judged exactly as the simulation
+    eats: one substep's worth (params.uptake_fraction of a step's appetite).
     """
     params = params or Params()
     indices = []
     for r, row in enumerate(grid.cells):
         for c, cell in enumerate(row):
             if cell.kind == TUMOR:
-                indices.append(warburg_index(cell_fluxes(cell, grid.glucose[r][c], grid.oxygen[r][c], params)))
+                fluxes = cell_fluxes(cell, grid.glucose[r][c], grid.oxygen[r][c], params,
+                                     params.uptake_fraction)
+                indices.append(warburg_index(fluxes))
     return indices
 
 
