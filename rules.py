@@ -2,7 +2,8 @@
 import random
 
 from datatypes import EMPTY, TUMOR, Cell, Field, Grid, Params, daughter_of, empty_cell
-from fba import atp, oxygen_used, solve_cell
+from fba import (atp, best_budget_amounts, budget_traits, fluxes_from_amounts, oxygen_used,
+                 solve_cell)
 from fields import apply_change, diffuse, make_field, refill_sources
 
 DIE = "die"
@@ -55,17 +56,38 @@ def cell_fate(cell: Cell, cell_atp: float, lactate: float,
     return STAY
 
 
-def metabolism(grid: Grid, fraction: float = 1.0) -> tuple[Field, Field, Field, Field]:
+def cell_fluxes(cell: Cell, glucose_here: float, oxygen_here: float, params: Params,
+                fraction: float = 1.0) -> dict[str, float]:
+    """
+    How one living cell metabolizes on its square, for `fraction` of a step:
+    - fixed-trait cell (mito_share None): solve_cell with its uptake and M;
+    - budget cell, evolving: uptake and M come from its inherited mito_share;
+    - budget cell, plastic (params.plastic): best split for the local glucose and O2.
+    Uptake, M and budget all scale with fraction.
+    """
+    if cell.mito_share is None:
+        return solve_cell(min(cell.glucose_uptake * fraction, glucose_here), oxygen_here,
+                          cell.mito_capacity * fraction)
+    if params.plastic:
+        a, b = best_budget_amounts(glucose_here, oxygen_here, params.budget * fraction, params.mito_cost)
+        return fluxes_from_amounts(a, b)
+    uptake, mito = budget_traits(cell.mito_share, params.budget, params.mito_cost)
+    return solve_cell(min(uptake * fraction, glucose_here), oxygen_here, mito * fraction)
+
+
+def metabolism(grid: Grid, fraction: float = 1.0, params: Params | None = None) -> tuple[Field, Field, Field, Field]:
     """
     Every living cell runs solve_cell on its own square's glucose and O2.
     Glucose taken in is also capped by the cell's glucose_uptake.
     fraction (0 to 1] is how much of a full step this covers: uptake and mito
     capacity are scaled by it, so k calls with fraction 1/k add up to one step
     when supply is plentiful (FBA scales: 1/k of the inputs -> 1/k of the fluxes).
+    params is needed only for budget cells (default Params()).
     Returns (atp_made, glucose_change, oxygen_change, lactate_change), each a
     field: ATP per cell, and how each square's chemicals change (used up is
     negative, released is positive). Empty squares make and change nothing.
     """
+    params = params or Params()
     num_rows, num_cols = grid.num_rows(), grid.num_cols()
     atp_made = make_field(num_rows, num_cols)
     glucose_change = make_field(num_rows, num_cols)
@@ -76,8 +98,7 @@ def metabolism(grid: Grid, fraction: float = 1.0) -> tuple[Field, Field, Field, 
             cell = grid.cells[r][c]
             if cell.kind == EMPTY:
                 continue
-            glucose_in = min(cell.glucose_uptake * fraction, grid.glucose[r][c])
-            fluxes = solve_cell(glucose_in, grid.oxygen[r][c], cell.mito_capacity * fraction)
+            fluxes = cell_fluxes(cell, grid.glucose[r][c], grid.oxygen[r][c], params, fraction)
             atp_made[r][c] = atp(fluxes)
             glucose_change[r][c] = -fluxes["v_in"]
             oxygen_change[r][c] = -oxygen_used(fluxes)
@@ -88,12 +109,17 @@ def metabolism(grid: Grid, fraction: float = 1.0) -> tuple[Field, Field, Field, 
 def make_daughter(parent: Cell, params: Params, rng: random.Random) -> Cell:
     """
     The new cell from a division. Healthy cells copy exactly. Tumor cells
-    (genetically unstable) mutate: mito_capacity + Gaussian noise with standard
-    deviation params.mutation_sd, kept >= 0. Other traits copy exactly.
+    (genetically unstable) mutate one trait with Gaussian noise of standard
+    deviation params.mutation_sd: mito_share (kept in [0, 1]) for budget cells,
+    otherwise mito_capacity (kept >= 0). Other traits copy exactly.
     """
     daughter = daughter_of(parent)
     if parent.kind == TUMOR and params.mutation_sd > 0:
-        daughter.mito_capacity = max(0.0, parent.mito_capacity + rng.gauss(0.0, params.mutation_sd))
+        noise = rng.gauss(0.0, params.mutation_sd)
+        if parent.mito_share is not None:
+            daughter.mito_share = min(1.0, max(0.0, parent.mito_share + noise))
+        else:
+            daughter.mito_capacity = max(0.0, parent.mito_capacity + noise)
     return daughter
 
 
@@ -172,7 +198,7 @@ def step(grid: Grid, params: Params, rng: random.Random) -> Grid:
     for _ in range(k):
         oxygen, glucose, lactate = refill_vessels(oxygen, glucose, lactate, grid.vessels, params)
         fed = Grid(grid.cells, oxygen, glucose, lactate, grid.vessels)
-        atp_part, glucose_change, oxygen_change, lactate_change = metabolism(fed, f)
+        atp_part, glucose_change, oxygen_change, lactate_change = metabolism(fed, f, params)
         atp_made = [[a + b for a, b in zip(ra, rb)] for ra, rb in zip(atp_made, atp_part)]
         oxygen = apply_change(oxygen, oxygen_change)
         glucose = apply_change(glucose, glucose_change)

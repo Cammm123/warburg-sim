@@ -86,7 +86,7 @@ class TestMetrics(unittest.TestCase):
 
     def test_no_tumor_gives_zeros(self) -> None:
         g = Grid([[empty_cell()]], [[0.0]], [[0.0]], [[0.0]], [])
-        self.assertEqual(summary(g), {"mean_mito": 0.0, "mean_warburg": 0.0})
+        self.assertEqual(summary(g), {"mean_mito": 0.0, "mean_share": 0.0, "mean_warburg": 0.0})
         self.assertEqual(mean([]), 0.0)
 
 

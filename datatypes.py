@@ -15,19 +15,26 @@ class Cell:
     - mito_capacity: most pyruvate per step its mitochondria can burn (M in solve_cell)
     - acid_tolerance: dies if local lactate is above this
     - glucose_uptake: most glucose per step it can take in (tumors make more transporters)
+    - mito_share: None for a cell with fixed traits (above). A number from 0 to 1
+      makes it a budget cell: it splits a protein budget between transporters
+      and mitochondria, spending this share on mitochondria (see fba.budget_traits).
     """
     def __init__(self, kind: str, mito_capacity: float = 0.0, acid_tolerance: float = 0.0,
-                 glucose_uptake: float = 1.0) -> None:
+                 glucose_uptake: float = 1.0, mito_share: float | None = None) -> None:
         if kind not in KINDS:
             raise ValueError(f"kind must be one of {KINDS}, not {kind!r}")
         self.kind = kind
         self.mito_capacity = mito_capacity
         self.acid_tolerance = acid_tolerance
         self.glucose_uptake = glucose_uptake
+        if mito_share is not None and not 0 <= mito_share <= 1:
+            raise ValueError("mito_share must be between 0 and 1 (or None)")
+        self.mito_share = mito_share
 
     def __repr__(self) -> str:
+        share = "" if self.mito_share is None else f", share={self.mito_share:g}"
         return (f"Cell({self.kind!r}, mito={self.mito_capacity:g}, "
-                f"acid_tol={self.acid_tolerance:g}, uptake={self.glucose_uptake:g})")
+                f"acid_tol={self.acid_tolerance:g}, uptake={self.glucose_uptake:g}{share})")
 
 
 def empty_cell() -> Cell:
@@ -36,8 +43,9 @@ def empty_cell() -> Cell:
 
 
 def daughter_of(parent: Cell) -> Cell:
-    """A new cell with the same traits as its parent (mutation comes in step 8)."""
-    return Cell(parent.kind, parent.mito_capacity, parent.acid_tolerance, parent.glucose_uptake)
+    """A new cell with the same traits as its parent (mutation is rules.make_daughter)."""
+    return Cell(parent.kind, parent.mito_capacity, parent.acid_tolerance, parent.glucose_uptake,
+                parent.mito_share)
 
 
 class Params:
@@ -47,7 +55,8 @@ class Params:
                  vessel_oxygen: float = 10.0, vessel_glucose: float = 2.0,
                  tumor_weight: float = 3.0, healthy_weight: float = 1.0,
                  diffusion_substeps: int = 1, uptake_fraction: float = 1.0,
-                 mutation_sd: float = 0.0) -> None:
+                 mutation_sd: float = 0.0, budget: float = 20.0, mito_cost: float = 10.0,
+                 plastic: bool = False) -> None:
         self.survive_atp = survive_atp          # ATP needed to stay alive
         self.divide_atp = divide_atp            # ATP needed to divide
         self.oxygen_rate = oxygen_rate          # diffusion rates (0 to 1)
@@ -74,6 +83,14 @@ class Params:
         if mutation_sd < 0:
             raise ValueError("mutation_sd must be >= 0")
         self.mutation_sd = mutation_sd
+        # Budget cells (mito_share not None): uptake + mito_cost x M = budget.
+        # plastic=True: they pick the best split every substep instead of using
+        # their inherited mito_share.
+        if budget <= 0 or mito_cost <= 0:
+            raise ValueError("budget and mito_cost must be positive")
+        self.budget = budget
+        self.mito_cost = mito_cost
+        self.plastic = plastic
 
 
 class Grid:

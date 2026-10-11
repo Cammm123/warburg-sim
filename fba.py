@@ -100,6 +100,11 @@ def pathway_amounts(glucose: float, oxygen: float, mito_capacity: float) -> tupl
     return glucose - b, b
 
 
+def fluxes_from_amounts(a: float, b: float) -> dict[str, float]:
+    """The flux vector a FERMENT + b RESPIRE, by reaction name."""
+    return {name: a * f + b * r for name, f, r in zip(REACTIONS, FERMENT, RESPIRE)}
+
+
 def solve_cell(glucose: float, oxygen: float, mito_capacity: float) -> dict[str, float]:
     """
     Closed-form FBA for one cell: the steady-state flux vector (S v = 0) that
@@ -109,7 +114,7 @@ def solve_cell(glucose: float, oxygen: float, mito_capacity: float) -> dict[str,
     Raises ValueError if any input is negative.
     """
     a, b = pathway_amounts(glucose, oxygen, mito_capacity)
-    return {name: a * f + b * r for name, f, r in zip(REACTIONS, FERMENT, RESPIRE)}
+    return fluxes_from_amounts(a, b)
 
 
 def warburg_index(fluxes: dict[str, float]) -> float:
@@ -120,6 +125,75 @@ def warburg_index(fluxes: dict[str, float]) -> float:
     a = fluxes["v_l"] / FERMENT[REACTIONS.index("v_l")]
     b = fluxes["v_m"] / RESPIRE[REACTIONS.index("v_m")]
     return a / (a + b) if a + b > 0 else 0.0
+
+
+# ---- The shared protein budget (step 8c) -----------------------------------
+# A budget cell splits a budget B between transporters (uptake u, cost 1 per
+# unit) and mitochondria (capacity M, cost mito_cost = k per unit):
+#     u + k M = B
+# In flux terms, taking in g glucose needs u >= g, and respiring b glucose needs
+# M >= 2b, so the budget is one more linear inequality:  g + 2k b <= B.
+
+ATP_FERMENT = 2.0    # ATP per glucose through FERMENT (= atp of the FERMENT vector)
+ATP_RESPIRE = 32.0   # ATP per glucose through RESPIRE
+
+
+def budget_traits(mito_share: float, budget: float, mito_cost: float) -> tuple[float, float]:
+    """(glucose_uptake, mito_capacity) for a cell spending mito_share of its budget on mitochondria."""
+    if not 0 <= mito_share <= 1:
+        raise ValueError("mito_share must be between 0 and 1")
+    return (1 - mito_share) * budget, mito_share * budget / mito_cost
+
+
+def solve_2x2(p1: float, q1: float, r1: float, p2: float, q2: float, r2: float) -> tuple[float, float] | None:
+    """
+    Solve p1 x + q1 y = r1 and p2 x + q2 y = r2 by Cramer's rule.
+    Returns None when the lines are parallel (determinant 0).
+    """
+    det = p1 * q2 - p2 * q1
+    if abs(det) < 1e-12:
+        return None
+    return (r1 * q2 - r2 * q1) / det, (p1 * r2 - p2 * r1) / det
+
+
+def best_budget_amounts(glucose: float, oxygen: float, budget: float,
+                        mito_cost: float) -> tuple[float, float]:
+    """
+    A plastic cell's best split, as null-space amounts (a, b) = (fermented, respired).
+    Choose glucose taken in g and respired b to maximize ATP = 2(g - b) + 32 b
+    subject to:   g + 2k b <= budget,  g <= glucose,  b <= oxygen / 6,  b <= g,
+                  g >= 0,  b >= 0.
+    A linear objective on a polygon is largest at a corner, so: intersect every
+    pair of constraint lines, keep the corners that satisfy every constraint,
+    and return the corner with the most ATP.
+    Raises ValueError if any input is negative or budget/mito_cost isn't positive.
+    """
+    if glucose < 0 or oxygen < 0:
+        raise ValueError("glucose and oxygen must be >= 0")
+    if budget <= 0 or mito_cost <= 0:
+        raise ValueError("budget and mito_cost must be positive")
+    # Each constraint p g + q b <= r.
+    # Respiring one glucose needs PYRUVATE_BURNED_PER_RESPIRED_GLUCOSE (= 2) units
+    # of M, each costing mito_cost, hence the 2k in g + 2k b <= budget.
+    constraints = [(1.0, mito_cost * PYRUVATE_BURNED_PER_RESPIRED_GLUCOSE, budget),
+                   (1.0, 0.0, glucose),
+                   (0.0, 1.0, oxygen / O2_PER_RESPIRED_GLUCOSE),
+                   (-1.0, 1.0, 0.0),
+                   (-1.0, 0.0, 0.0),
+                   (0.0, -1.0, 0.0)]
+    best_g, best_b, best_atp = 0.0, 0.0, 0.0
+    for i in range(len(constraints)):
+        for j in range(i + 1, len(constraints)):
+            corner = solve_2x2(*constraints[i], *constraints[j])
+            if corner is None:
+                continue
+            g, b = corner
+            if all(p * g + q * b <= r + 1e-9 for p, q, r in constraints):
+                value = ATP_FERMENT * (g - b) + ATP_RESPIRE * b
+                if value > best_atp + 1e-12:
+                    best_g, best_b, best_atp = g, b, value
+    a, b = best_g - best_b, best_b
+    return (a if a > 0 else 0.0), (b if b > 0 else 0.0)   # also turns -0.0 into 0.0
 
 
 def flux_vector(fluxes: dict[str, float]) -> list[float]:
