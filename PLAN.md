@@ -65,6 +65,8 @@ Environment: Homebrew Python 3.14 has no numpy or scipy, so we make `warburg-sim
 8c. **Shared budget (added 2026-10-10):** budget cells split uptake + k·M = B; evolving share (heritable) and plastic (best corner each substep) scenarios.
 9. **Experiment:** run with acid harm on and off. Does low M (Warburg) take over only when acid hurts healthy cells? This could become a blog post.
 
+Status (2026-10-10): steps 1-9 done; results and interpretation in `FINDINGS.md`.
+
 Later (v2): immune cells killed by lactate, an evolving acid tolerance, the JS web version (`web/`, the spatial-games pattern), and a blog post.
 
 ## Memory and bookkeeping
