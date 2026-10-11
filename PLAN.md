@@ -60,7 +60,8 @@ Environment: Homebrew Python 3.14 has no numpy or scipy, so we make `warburg-sim
 5. **Cell rules:** `neighbors` and `cell_fate`, with each threshold tested at, just above and just below it.
 6. **One full step** on a tiny 5×5 grid, checked by hand.
 7. **Render:** SVG frames and an HTML viewer. Then the first real run, about 100×100 with a vessel row along one edge.
-8. **Evolution:** daughter cells inherit M with a small random mutation, under a fixed seed. Plot mean M over time.
+8a. **Null space made explicit (added 2026-10-10):** `linalg.py` (exact rref, rank, null space, left null space, integer basis via Euclid's gcd). `solve_cell` is built on the computed basis (a·FERMENT + b·RESPIRE), plus a per-cell Warburg index a/(a+b).
+8. **Evolution (8b):** daughter cells inherit M with a small random mutation, under a fixed seed. Plot mean M over time.
 9. **Experiment:** run with acid harm on and off. Does low M (Warburg) take over only when acid hurts healthy cells? This could become a blog post.
 
 Later (v2): immune cells killed by lactate, an evolving acid tolerance, the JS web version (`web/`, the spatial-games pattern), and a blog post.

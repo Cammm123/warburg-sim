@@ -8,13 +8,16 @@ Step 4: writes output/diffusion.svg (a spike spreading out, and oxygen from a
 blood vessel being used up by cells).
 Step 5: writes output/fate_map.svg (what cell_fate decides for every ATP and
 lactate level, for a healthy and a tumor cell).
-Step 6: prints a small grid before and after a few full steps. Standard library only.
+Step 6: prints a small grid before and after a few full steps.
+Step 8a: prints the rref, rank, null space and left null space of S, and each
+cell's (a, b) coordinates in the null space. Standard library only.
 """
 import os
 import random
 
 from fba import (METABOLITES, REACTIONS, atp, flux_vector, mat_vec, oxygen_used,
-                 solve_cell, stoichiometric_matrix)
+                 pathway_amounts, solve_cell, stoichiometric_matrix, warburg_index)
+from linalg import integer_vector, left_null_space, null_space, rank, rref
 from fields import Field, apply_change, diffuse, make_field, refill_sources, total
 from datatypes import EMPTY, HEALTHY, TUMOR, Cell, Grid, Params, empty_cell
 from rules import DIE, DIVIDE, STAY, cell_fate, step
@@ -215,6 +218,31 @@ def small_run() -> None:
         print_grid(grid, f"after step {n}")
 
 
+def null_space_tour() -> None:
+    """Print S's row reduction, its null space and left null space, and cells in (a, b)."""
+    s = stoichiometric_matrix()
+    reduced, pivots = rref(s)
+    print("  rref(S):")
+    print(" " * 12 + "".join(f"{name:>7}" for name in REACTIONS))
+    for row in reduced:
+        print(" " * 12 + "".join(f"{str(entry):>7}" for entry in row))
+    print(f"  pivot columns: {[REACTIONS[p] for p in pivots]}, rank {rank(s)}, "
+          f"so the null space has dimension {len(REACTIONS)} - {rank(s)} = {len(null_space(s))}")
+    for v in null_space(s):
+        print(f"    basis vector {[str(x) for x in v]}  ->  integer {integer_vector(v)}")
+    for y in left_null_space(s):
+        terms = " + ".join(f"{int(c) if c != 1 else ''}{m}" for c, m in zip(integer_vector(y), METABOLITES) if c)
+        print(f"  left null space {integer_vector(y)}: {terms} is conserved")
+    print("\n  each cell as a FERMENT + b RESPIRE  (a = glucose fermented, b = glucose respired)")
+    print(f"  {'cell':<30}{'G':>4}{'O2':>5}{'M':>6} |{'a':>6}{'b':>6}{'ATP':>7}  Warburg index")
+    for label, g, o, m in [("healthy, plenty of O2", 1, 10, 10), ("healthy, half the O2", 1, 3, 10),
+                           ("no O2", 1, 0, 10), ("Warburg tumor", 1, 10, 0.5),
+                           ("Warburg tumor, uptake 8", 8, 10, 0.5)]:
+        a, b = pathway_amounts(g, o, m)
+        f = solve_cell(g, o, m)
+        print(f"  {label:<30}{g:>4g}{o:>5g}{m:>6g} |{a:>6.2f}{b:>6.2f}{atp(f):>7.1f}  {warburg_index(f):.2f}")
+
+
 def main() -> None:
     print("STEP 1: the stoichiometric matrix S (rows = metabolites, columns = reactions)\n")
     print_matrix(stoichiometric_matrix())
@@ -261,6 +289,9 @@ def main() -> None:
 
     print("\nSTEP 6: full steps on a small grid (seed 1)\n")
     small_run()
+
+    print("\nSTEP 8a: the null space of S\n")
+    null_space_tour()
 
 
 if __name__ == "__main__":

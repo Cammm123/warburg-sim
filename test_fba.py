@@ -1,8 +1,8 @@
 """Tests for fba.py. Run from this folder: python3 -m unittest -v"""
 import unittest
 
-from fba import (METABOLITES, REACTIONS, atp, flux_vector, mat_vec,
-                 oxygen_used, solve_cell, stoichiometric_matrix)
+from fba import (FERMENT, METABOLITES, REACTIONS, RESPIRE, atp, flux_vector, mat_vec,
+                 oxygen_used, pathway_amounts, solve_cell, stoichiometric_matrix, warburg_index)
 
 
 class TestMatVec(unittest.TestCase):
@@ -145,6 +145,51 @@ class TestSolveCell(unittest.TestCase):
                 low, high = values[i], values[i + 1]
                 self.assertLessEqual(atp(solve_cell(g, low, 5)), atp(solve_cell(g, high, 5)))
                 self.assertLessEqual(atp(solve_cell(g, 10, low)), atp(solve_cell(g, 10, high)))
+
+
+
+class TestPathways(unittest.TestCase):
+    def test_pathways_come_out_as_expected(self) -> None:
+        self.assertEqual(RESPIRE, [1, 1, 2, 0, 2, 0])
+        self.assertEqual(FERMENT, [1, 1, 0, 2, 0, 2])
+
+    def test_each_pathway_is_a_steady_state(self) -> None:
+        for pathway in (RESPIRE, FERMENT):
+            self.assertEqual(mat_vec(stoichiometric_matrix(), pathway), [0, 0, 0, 0, 0])
+
+    def test_pathway_yields(self) -> None:
+        # One glucose each: respire makes 32 ATP and uses 6 O2; ferment makes 2 ATP and 2 lactate.
+        respire = dict(zip(REACTIONS, RESPIRE))
+        ferment = dict(zip(REACTIONS, FERMENT))
+        self.assertAlmostEqual(atp(respire), 32)
+        self.assertAlmostEqual(oxygen_used(respire), 6)
+        self.assertAlmostEqual(atp(ferment), 2)
+        self.assertEqual(ferment["v_out"], 2)
+
+    def test_pathway_amounts_hand_cases(self) -> None:
+        # (glucose, O2, M) -> (fermented a, respired b)
+        cases = [((1, 10, 0.5), (0.75, 0.25)),   # Warburg cell from the session
+                 ((1, 100, 100), (0, 1)),        # fully respiring
+                 ((1, 0, 10), (1, 0)),           # no O2
+                 ((1, 3, 100), (0.5, 0.5)),      # O2-limited: 3 / 6 = 0.5
+                 ((0, 10, 10), (0, 0))]          # no glucose
+        for args, (a, b) in cases:
+            got_a, got_b = pathway_amounts(*args)
+            self.assertAlmostEqual(got_a, a, msg=str(args))
+            self.assertAlmostEqual(got_b, b, msg=str(args))
+
+    def test_solve_cell_is_a_ferment_plus_b_respire(self) -> None:
+        for args in [(1, 10, 0.5), (2, 3, 10), (1, 0, 1), (3, 100, 100)]:
+            a, b = pathway_amounts(*args)
+            fluxes = solve_cell(*args)
+            for name, f, r in zip(REACTIONS, FERMENT, RESPIRE):
+                self.assertAlmostEqual(fluxes[name], a * f + b * r)
+
+    def test_warburg_index(self) -> None:
+        self.assertAlmostEqual(warburg_index(solve_cell(1, 10, 0.5)), 0.75)
+        self.assertAlmostEqual(warburg_index(solve_cell(1, 100, 100)), 0.0)
+        self.assertAlmostEqual(warburg_index(solve_cell(1, 0, 10)), 1.0)
+        self.assertAlmostEqual(warburg_index(solve_cell(0, 10, 10)), 0.0)   # no glucose
 
 
 if __name__ == "__main__":

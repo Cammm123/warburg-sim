@@ -5,7 +5,12 @@ Rows of S are metabolites, columns are reactions. Entry S[i][j] is how many of
 metabolite i reaction j makes (+) or uses up (-). For a flux vector v (one rate
 per reaction), S times v is how fast each metabolite's amount is changing, so
 steady state means S v = 0.
+
+The steady states are the null space of S. linalg.py computes it: it is
+2-dimensional, and its integer basis is two pathways, RESPIRE and FERMENT, each
+processing one glucose. Every cell's flux vector is a FERMENT + b RESPIRE.
 """
+from linalg import integer_vector, null_space
 
 METABOLITES = ["glucose", "pyruvate", "NAD+", "NADH", "lactate"]
 
@@ -28,6 +33,21 @@ def stoichiometric_matrix() -> list[list[int]]:
         [0, 2, -1, -1, 0, 0],   # NADH
         [0, 0, 0, 1, 0, -1],    # lactate
     ]
+
+
+def steady_state_pathways() -> tuple[list[int], list[int]]:
+    """
+    Compute the null space of S and return its integer basis as
+    (respire, ferment). Respire is the one that uses electron transport.
+    Raises ValueError if the null space isn't the expected two pathways.
+    """
+    basis = [integer_vector(v) for v in null_space(stoichiometric_matrix())]
+    if len(basis) != 2:
+        raise ValueError(f"expected a 2-dimensional null space, got {len(basis)}")
+    v_e = REACTIONS.index("v_e")
+    respire = next(v for v in basis if v[v_e] > 0)
+    ferment = next(v for v in basis if v[v_e] == 0)
+    return respire, ferment
 
 
 def mat_vec(matrix: list[list[float]], vector: list[float]) -> list[float]:
@@ -57,25 +77,49 @@ O2_PER_NADH = 0.5
 O2_PER_PYRUVATE = 2.5
 
 
-def solve_cell(glucose: float, oxygen: float, mito_capacity: float) -> dict[str, float]:
-    """
-    Closed-form FBA for one cell: the steady-state flux vector (S v = 0) that
-    makes the most ATP, given how much glucose and O2 the cell can take in and
-    how much pyruvate its mitochondria can burn.
+RESPIRE, FERMENT = steady_state_pathways()
 
-    S v = 0 forces v_e = v_m = r (pyruvate respired) and v_l = 2 v_g - r
-    (pyruvate fermented). ATP = 2 v_g + 15 r, so the best choice is to take in
-    all the glucose and make r as large as every limit allows:
-        r = min(2 * glucose, oxygen / 3, mito_capacity)
+# What one glucose through each pathway costs and makes, read off the vectors.
+O2_PER_RESPIRED_GLUCOSE = (O2_PER_NADH * RESPIRE[REACTIONS.index("v_e")]
+                           + O2_PER_PYRUVATE * RESPIRE[REACTIONS.index("v_m")])   # 6
+PYRUVATE_BURNED_PER_RESPIRED_GLUCOSE = RESPIRE[REACTIONS.index("v_m")]           # 2
+
+
+def pathway_amounts(glucose: float, oxygen: float, mito_capacity: float) -> tuple[float, float]:
+    """
+    The best steady state in null-space coordinates: (a, b) = (glucose
+    fermented, glucose respired). Respiring makes 32 ATP per glucose and
+    fermenting 2, so respire as much as every limit allows and ferment the rest:
+        b = min(glucose, oxygen / 6, mito_capacity / 2),   a = glucose - b
     Raises ValueError if any input is negative.
     """
     if glucose < 0 or oxygen < 0 or mito_capacity < 0:
         raise ValueError("glucose, oxygen and mito_capacity must be >= 0")
-    v_g = glucose
-    oxygen_per_r = O2_PER_NADH + O2_PER_PYRUVATE   # = 3
-    r = min(2 * v_g, oxygen / oxygen_per_r, mito_capacity)
-    v_l = 2 * v_g - r
-    return {"v_in": v_g, "v_g": v_g, "v_e": r, "v_l": v_l, "v_m": r, "v_out": v_l}
+    b = min(glucose, oxygen / O2_PER_RESPIRED_GLUCOSE,
+            mito_capacity / PYRUVATE_BURNED_PER_RESPIRED_GLUCOSE)
+    return glucose - b, b
+
+
+def solve_cell(glucose: float, oxygen: float, mito_capacity: float) -> dict[str, float]:
+    """
+    Closed-form FBA for one cell: the steady-state flux vector (S v = 0) that
+    makes the most ATP, given how much glucose and O2 the cell can take in and
+    how much pyruvate its mitochondria can burn. Built from the null space:
+        v = a FERMENT + b RESPIRE, with (a, b) from pathway_amounts.
+    Raises ValueError if any input is negative.
+    """
+    a, b = pathway_amounts(glucose, oxygen, mito_capacity)
+    return {name: a * f + b * r for name, f, r in zip(REACTIONS, FERMENT, RESPIRE)}
+
+
+def warburg_index(fluxes: dict[str, float]) -> float:
+    """
+    Share of glucose that is fermented, a / (a + b): 0 = fully respiring,
+    1 = fully fermenting. A cell taking in no glucose gets 0.
+    """
+    a = fluxes["v_l"] / FERMENT[REACTIONS.index("v_l")]
+    b = fluxes["v_m"] / RESPIRE[REACTIONS.index("v_m")]
+    return a / (a + b) if a + b > 0 else 0.0
 
 
 def flux_vector(fluxes: dict[str, float]) -> list[float]:
