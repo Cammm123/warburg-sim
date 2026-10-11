@@ -1,4 +1,10 @@
-# Warburg simulation: web version (plan)
+# Warburg simulation: web version (spec)
+
+Status (2026-10-10): steps 1-7 built. `node model.test.js` gives 69 checks, including every
+Python golden case. Every preset matches its Python run. Phone layout checked. Left: step 8,
+which is Cameron deploying on Vercel (root directory `warburg-sim/web`), then the November
+blog post. Local preview: the `warburg-web` config in the root `.claude/launch.json`
+(port 8126).
 
 ## Context
 
