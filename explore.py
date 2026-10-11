@@ -7,15 +7,17 @@ and writes output/cell_response.svg (one cell's ATP and lactate vs oxygen).
 Step 4: writes output/diffusion.svg (a spike spreading out, and oxygen from a
 blood vessel being used up by cells).
 Step 5: writes output/fate_map.svg (what cell_fate decides for every ATP and
-lactate level, for a healthy and a tumor cell). Standard library only.
+lactate level, for a healthy and a tumor cell).
+Step 6: prints a small grid before and after a few full steps. Standard library only.
 """
 import os
+import random
 
 from fba import (METABOLITES, REACTIONS, atp, flux_vector, mat_vec, oxygen_used,
                  solve_cell, stoichiometric_matrix)
 from fields import Field, apply_change, diffuse, make_field, refill_sources, total
-from datatypes import HEALTHY, TUMOR, Cell
-from rules import DIE, DIVIDE, STAY, cell_fate
+from datatypes import EMPTY, HEALTHY, TUMOR, Cell, Grid, Params, empty_cell
+from rules import DIE, DIVIDE, STAY, cell_fate, step
 
 
 def print_matrix(matrix: list[list[float]]) -> None:
@@ -185,6 +187,34 @@ def fate_map_svg(path: str, survive_atp: float, divide_atp: float) -> None:
         file.write("\n".join(parts))
 
 
+def print_grid(grid: Grid, label: str) -> None:
+    """Cells as letters (V vessel, H healthy, T tumor, . empty) beside O2 and lactate."""
+    vessels = set(grid.vessels)
+    print(f"  {label}:  {grid.count(HEALTHY)} healthy, {grid.count(TUMOR)} tumor")
+    print(f"    {'cells':<{2 * grid.num_cols()}}   {'oxygen':<{5 * grid.num_cols()}}  lactate")
+    for r in range(grid.num_rows()):
+        letters = " ".join("V" if (r, c) in vessels else {EMPTY: ".", HEALTHY: "H", TUMOR: "T"}[cell.kind]
+                           for c, cell in enumerate(grid.cells[r]))
+        oxygen = "".join(f"{v:5.1f}" for v in grid.oxygen[r])
+        lactate = "".join(f"{v:5.1f}" for v in grid.lactate[r])
+        print(f"    {letters}   {oxygen}  {lactate}")
+
+
+def small_run() -> None:
+    """7x7: vessel row on top, healthy tissue below, one Warburg tumor cell in the middle."""
+    size = 7
+    vessels = [(0, c) for c in range(size)]
+    cells = [[empty_cell() if r == 0 else Cell(HEALTHY, 10, 1.0) for c in range(size)] for r in range(size)]
+    cells[4][3] = Cell(TUMOR, 0.5, 3.0, glucose_uptake=2.0)
+    grid = Grid(cells, make_field(size, size, 6.0), make_field(size, size, 1.0),
+                make_field(size, size), vessels)
+    rng = random.Random(1)
+    print_grid(grid, "start")
+    for n in range(1, 4):
+        grid = step(grid, Params(), rng)
+        print_grid(grid, f"after step {n}")
+
+
 def main() -> None:
     print("STEP 1: the stoichiometric matrix S (rows = metabolites, columns = reactions)\n")
     print_matrix(stoichiometric_matrix())
@@ -224,6 +254,9 @@ def main() -> None:
         print(f"  {label:<28} ATP {cell_atp:>5g}  lactate {lac:>4g}  ->  {cell_fate(cell, cell_atp, lac, 5, 20)}")
     fate_map_svg(os.path.join("output", "fate_map.svg"), 5, 20)
     print("Wrote output/fate_map.svg")
+
+    print("\nSTEP 6: full steps on a small grid (seed 1)\n")
+    small_run()
 
 
 if __name__ == "__main__":
