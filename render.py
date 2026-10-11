@@ -69,7 +69,7 @@ def grid_svg(grid: Grid, title: str, oxygen_top: float, lactate_top: float, squa
 def line_chart_svg(series: dict[str, list[float]], colors: dict[str, str], title: str,
                    y_label: str, x_step: int = 1) -> str:
     """Lines over time. series maps a name to its values; x is the frame number x x_step."""
-    width, height, left, top, plot_w, plot_h = 640, 300, 60, 36, 540, 210
+    width, height, left, top, plot_w, plot_h = 640, 310, 60, 36, 540, 210
     length = max(len(values) for values in series.values())
     top_value = max(1.0, max(max(values) for values in series.values()))
     parts = [f'<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 {width} {height}" '
@@ -77,8 +77,8 @@ def line_chart_svg(series: dict[str, list[float]], colors: dict[str, str], title
              f'<text x="{left}" y="20" font-size="14">{title}</text>',
              f'<line x1="{left}" y1="{top + plot_h}" x2="{left + plot_w}" y2="{top + plot_h}" stroke="#888"/>',
              f'<line x1="{left}" y1="{top}" x2="{left}" y2="{top + plot_h}" stroke="#888"/>',
-             f'<text x="{left + plot_w / 2}" y="{top + plot_h + 34}" text-anchor="middle">step</text>',
-             f'<text x="{left - 8}" y="{top + 4}" text-anchor="end">{top_value:g}</text>',
+             f'<text x="{left + 20}" y="{top + plot_h + 34}" text-anchor="middle">step</text>',
+             f'<text x="{left - 8}" y="{top + 4}" text-anchor="end">{top_value:.3g}</text>',
              f'<text x="{left - 8}" y="{top + plot_h + 4}" text-anchor="end">0</text>',
              f'<text x="{left - 8}" y="{top - 10}" text-anchor="start">{y_label}</text>']
     for i in range(5):
@@ -89,8 +89,8 @@ def line_chart_svg(series: dict[str, list[float]], colors: dict[str, str], title
         points = " ".join(f"{left + plot_w * i / max(length - 1, 1):.1f},{top + plot_h * (1 - v / top_value):.1f}"
                           for i, v in enumerate(values))
         parts.append(f'<polyline points="{points}" fill="none" stroke="{colors[name]}" stroke-width="2.5"/>')
-        parts.append(f'<rect x="{left + plot_w - 130}" y="{top + 8 + 18 * k}" width="12" height="3" fill="{colors[name]}"/>')
-        parts.append(f'<text x="{left + plot_w - 112}" y="{top + 13 + 18 * k}">{name}</text>')
+        parts.append(f'<rect x="{left + 200 + 170 * k}" y="{height - 14}" width="12" height="3" fill="{colors[name]}"/>')
+        parts.append(f'<text x="{left + 218 + 170 * k}" y="{height - 9}">{name}</text>')
     parts.append("</svg>")
     return "\n".join(parts)
 
