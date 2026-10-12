@@ -48,8 +48,7 @@
         <div class="wide">
           <h3>6. What it found, and its limits</h3>
           <ul>
-            <li><b>Acid is the tumor's only way in.</b> With harmless acid the tumor never grows: the tissue is full, and healthy cells never die on their own here. Part of this is built into the rules (cells only grow into empty squares; nothing pushes), so the lesson is about acid as a weapon, not proof that real tumors can't invade otherwise.</li>
-            <li><b>Healthy cells' acid tolerance is the switch.</b> At tolerance 1 the tumor wipes out the tissue every time. At 2 it stays contained at a few dozen cells.</li>
+            <li><b>Healthy cells' acid tolerance is the switch.</b> At tolerance 1 the tumor wipes out the tissue every time. At 2 it stays small, and at 3 (as acid-tough as tumor cells) it barely grows at all.</li>
             <li><b>Evolution pushes tumors away from fermenting.</b> The share of the budget spent on mitochondria rose from 0.5 to about 0.9 every time (the marker moved less than 0.1). Fermenting helps the tumor invade, then its descendants switch to respiring, keeping their acid just under the level they can survive.</li>
             <li><b>Greedy cells destroy themselves.</b> Cells that always grab the most energy right now poison themselves with their own acid in one step.</li>
           </ul>
@@ -94,12 +93,10 @@
             <h3>1. Can a tumor's acid clear out healthy tissue?</h3>
             <p>These tumor cells ferment almost all their sugar and give off lactate, an acid. Healthy cells die in strong acid; tumor cells can take three times more.</p>
             <p class="watch"><b>Watch for:</b> a ring of empty space spreading out ahead of the tumor.</p>
-            <div class="qbuttons"><button class="run" data-name="invasion">Run this</button>
-            <button class="compare" id="harmless">Compare: make the acid harmless</button></div>
+            <div class="qbuttons"><button class="run" data-name="invasion">Run this</button></div>
             <p class="tip"><b>Try the other views:</b> <button class="viewlink" data-view="acid">Acid</button> shows the acid front moving out ahead of the tumor. <button class="viewlink" data-view="oxygen">Oxygen</button> shows the cleared zone filling with oxygen: the tumor isn't short of oxygen; it wins with acid.</p>
             <details class="seen"><summary>What did I just see?</summary>
-              <p><b>With toxic acid:</b> the tumor ferments about 97% of its sugar and gives off lactate. Wherever the acid passes 1, healthy cells die, opening empty squares that the tumor divides into. By around step 110 every healthy cell is gone. The tumor itself only survives near capillaries, where blood washes its acid away; elsewhere it keeps poisoning itself. This is the <b>acid-mediated invasion</b> idea from cancer research: a tumor clearing space with its own acid.</p>
-              <p><b>With harmless acid:</b> the tumor stays at its starting 9 cells. The tissue is full, nobody dies, so there is never an empty square to grow into.</p>
+              <p>The tumor ferments about 97% of its sugar and gives off lactate. Wherever the acid passes 1, healthy cells die, opening empty squares that the tumor divides into. By around step 110 every healthy cell is gone. The tumor itself only survives near capillaries, where blood washes its acid away; elsewhere it keeps poisoning itself. This is the <b>acid-mediated invasion</b> idea from cancer research: a tumor clearing space with its own acid.</p>
               <p><b>What it suggests:</b> two ways to stop this kind of invasion are to neutralize the acid or to help healthy cells tolerate it (try healthy acid tolerance 2 in Advanced settings: the tumor stays contained). Researchers have tested the first idea: in mice, drinking baking soda (bicarbonate) made tumors less acidic and reduced how often they spread<sup><a href="https://pubmed.ncbi.nlm.nih.gov/19276390/" target="_blank" rel="noopener">1</a></sup>. The effect was small and varied between tumor types, and it isn't an approved treatment, so it is a lead rather than a cure.</p>
             </details>
           </div>
@@ -159,7 +156,7 @@
         <input type="range" id="weight" min="1" max="5" step="0.5" value="3">
         <p class="help">When a tumor and a healthy cell want the same empty square: the tumor's odds. 1 : 1 is a fair coin.</p>
       </div>
-      <p class="help">Evolution and harmless acid are set by the questions above.</p>
+      <p class="help">Evolution is set by the questions above.</p>
     </details>
 
     <details class="card more" id="inspectBox">

@@ -15,7 +15,7 @@ const VIEWS = {
 
 const state = {
   preset: "invasion", grid: null, params: null, rng: null, seed: 1, stepCount: 0,
-  playing: false, selected: null, view: "cells", acidHarmless: false, stepsPerSecond: 6, owed: 0, lastTime: null,
+  playing: false, selected: null, view: "cells", stepsPerSecond: 6, owed: 0, lastTime: null,
   history: { healthy: [], tumor: [], trait: [], warburg: [] },
 };
 
@@ -28,7 +28,7 @@ function readSettings() {
 
 /** Params overrides from the settings, on top of the question's own (which set evolution). */
 function overrides(settings) {
-  return { vesselGlucose: settings.glucose, tumorWeight: settings.weight, acidHarm: !state.acidHarmless };
+  return { vesselGlucose: settings.glucose, tumorWeight: settings.weight };
 }
 
 function showSettings() {
@@ -36,7 +36,6 @@ function showSettings() {
   $("toleranceOut").textContent = s.tolerance.toFixed(1);
   $("glucoseOut").textContent = s.glucose.toFixed(1);
   $("weightOut").textContent = `${s.weight % 1 ? s.weight.toFixed(1) : s.weight} : 1`;
-  $("harmless").classList.toggle("active", state.preset === "invasion" && state.acidHarmless);
 }
 
 /** Apply settings to the running simulation (the next step uses them). */
@@ -59,14 +58,13 @@ function startRun() {
   draw();
 }
 
-/** Choose a question. acidHarmless: question 1's comparison run. */
-function chooseQuestion(name, acidHarmless = false) {
+/** Choose a question. */
+function chooseQuestion(name) {
   state.preset = name;
   const preset = M.PRESETS[name];
-  state.acidHarmless = acidHarmless;
   $("tolerance").value = 1; $("glucose").value = 5; $("weight").value = 3;
   document.querySelectorAll(".question").forEach((q) => q.classList.toggle("active", q.dataset.name === name));
-  document.querySelectorAll(".run").forEach((b) => b.classList.toggle("active", b.dataset.name === name && !acidHarmless));
+  document.querySelectorAll(".run").forEach((b) => b.classList.toggle("active", b.dataset.name === name));
   $("traitCaption").innerHTML = preset.trait
     ? '<span class="swatch" style="background:#d85a30"></span>share of sugar fermented (0 = all respired, 1 = all fermented) &nbsp; <span class="swatch" style="background:#534ab7"></span>share of the budget spent on mitochondria'
     : '<span class="swatch" style="background:#d85a30"></span>share of sugar the tumor ferments (0 = all respired, 1 = all fermented)';
@@ -339,7 +337,6 @@ function frame(time) {
 
 function init() {
   document.querySelectorAll(".run").forEach((b) => b.addEventListener("click", () => chooseQuestion(b.dataset.name)));
-  $("harmless").addEventListener("click", () => chooseQuestion("invasion", true));
   $("play").addEventListener("click", () => setPlaying(!state.playing));
   $("stepBtn").addEventListener("click", () => { setPlaying(false); doStep(); draw(); });
   $("reset").addEventListener("click", () => { state.seed++; setPlaying(false); startRun(); });
