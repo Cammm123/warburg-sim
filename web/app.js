@@ -6,7 +6,6 @@ const M = window.WarburgModel;
 const SIZE = 60;
 const CELL_PX = 8;   // the map is drawn at 8 px per grid square
 
-const MUTATION_SD = { invasion: 0.1, evolution: 0.05, greedy: 0.05 };
 
 const VIEWS = {
   cells: "Each square is one cell. Healthy cells are green. Tumor cells are colored by how they make energy: orange = fermenting, purple = respiring.",
@@ -16,7 +15,7 @@ const VIEWS = {
 
 const state = {
   preset: "invasion", grid: null, params: null, rng: null, seed: 1, stepCount: 0,
-  playing: false, selected: null, view: "cells", stepsPerSecond: 6, owed: 0, lastTime: null,
+  playing: false, selected: null, view: "cells", acidHarmless: false, stepsPerSecond: 6, owed: 0, lastTime: null,
   history: { healthy: [], tumor: [], trait: [], warburg: [] },
 };
 
@@ -24,18 +23,12 @@ const $ = (id) => document.getElementById(id);
 
 // ---- Settings ------------------------------------------------------------------
 function readSettings() {
-  return {
-    tolerance: +$("tolerance").value, glucose: +$("glucose").value, weight: +$("weight").value,
-    mutation: $("mutation").checked, acid: $("acid").checked,
-  };
+  return { tolerance: +$("tolerance").value, glucose: +$("glucose").value, weight: +$("weight").value };
 }
 
-/** Params overrides from the settings, on top of the question's own. */
+/** Params overrides from the settings, on top of the question's own (which set evolution). */
 function overrides(settings) {
-  return {
-    vesselGlucose: settings.glucose, tumorWeight: settings.weight, acidHarm: settings.acid,
-    mutationSd: settings.mutation ? MUTATION_SD[state.preset] : 0,
-  };
+  return { vesselGlucose: settings.glucose, tumorWeight: settings.weight, acidHarm: !state.acidHarmless };
 }
 
 function showSettings() {
@@ -43,7 +36,7 @@ function showSettings() {
   $("toleranceOut").textContent = s.tolerance.toFixed(1);
   $("glucoseOut").textContent = s.glucose.toFixed(1);
   $("weightOut").textContent = `${s.weight % 1 ? s.weight.toFixed(1) : s.weight} : 1`;
-  $("harmless").classList.toggle("active", state.preset === "invasion" && !s.acid);
+  $("harmless").classList.toggle("active", state.preset === "invasion" && state.acidHarmless);
 }
 
 /** Apply settings to the running simulation (the next step uses them). */
@@ -70,8 +63,7 @@ function startRun() {
 function chooseQuestion(name, acidHarmless = false) {
   state.preset = name;
   const preset = M.PRESETS[name];
-  $("mutation").checked = (preset.params.mutationSd || 0) > 0;
-  $("acid").checked = !acidHarmless;
+  state.acidHarmless = acidHarmless;
   $("tolerance").value = 1; $("glucose").value = 5; $("weight").value = 3;
   document.querySelectorAll(".question").forEach((q) => q.classList.toggle("active", q.dataset.name === name));
   document.querySelectorAll(".run").forEach((b) => b.classList.toggle("active", b.dataset.name === name && !acidHarmless));
@@ -315,6 +307,13 @@ function drawInspector() {
   drawPlane(a, b, cellLimits(cell, glucose, oxygen));
 }
 
+/** Switch the map to a view (cells, oxygen, acid). */
+function setView(view) {
+  state.view = view;
+  document.querySelectorAll(".tabs button").forEach((x) => x.setAttribute("aria-selected", String(x.dataset.view === view)));
+  drawLegend(); draw();
+}
+
 // ---- Wiring --------------------------------------------------------------------------------
 function setPlaying(on) {
   state.playing = on;
@@ -344,16 +343,12 @@ function init() {
   $("play").addEventListener("click", () => setPlaying(!state.playing));
   $("stepBtn").addEventListener("click", () => { setPlaying(false); doStep(); draw(); });
   $("reset").addEventListener("click", () => { state.seed++; setPlaying(false); startRun(); });
-  ["tolerance", "glucose", "weight", "mutation", "acid"].forEach((id) => $(id).addEventListener("input", applySettings));
+  ["tolerance", "glucose", "weight"].forEach((id) => $(id).addEventListener("input", applySettings));
   document.querySelectorAll(".speed button").forEach((b) => b.addEventListener("click", () => {
     state.stepsPerSecond = +b.dataset.speed;
     document.querySelectorAll(".speed button").forEach((x) => x.classList.toggle("active", x === b));
   }));
-  document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => {
-    state.view = b.dataset.view;
-    document.querySelectorAll(".tabs button").forEach((x) => x.setAttribute("aria-selected", String(x === b)));
-    drawLegend(); draw();
-  }));
+  document.querySelectorAll(".tabs button, .viewlink").forEach((b) => b.addEventListener("click", () => setView(b.dataset.view)));
   $("map").addEventListener("click", (e) => {
     const rect = e.target.getBoundingClientRect();
     const c = Math.floor(((e.clientX - rect.left) / rect.width) * SIZE), r = Math.floor(((e.clientY - rect.top) / rect.height) * SIZE);

@@ -130,3 +130,13 @@ details.more[open] summary { margin-bottom: 8px; }
 .toggle span { font-size: 0.92rem; }
 .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #2c2c2a; margin-right: 6px; vertical-align: -1px; }
 .swatch.outline { background: transparent; border: 1.5px solid #d85a30; }
+.how.top { margin: 0 0 20px; }
+.how .wide { grid-column: 1 / -1; }
+.how ul { margin: 0 0 10px; padding-left: 20px; font-size: 0.92rem; }
+.how li { margin-bottom: 6px; }
+.tip { font-size: 0.88rem; color: var(--muted); background: var(--accent-soft); border-radius: 8px; padding: 8px 10px; margin-top: 8px; }
+.viewlink { min-height: 0; padding: 1px 8px; font-size: 0.85rem; border-radius: 6px; }
+details.seen { margin-top: 8px; }
+details.seen summary { cursor: pointer; font-weight: 600; color: var(--accent); }
+details.seen p { font-size: 0.9rem; }
+details.seen sup a { color: var(--accent); }

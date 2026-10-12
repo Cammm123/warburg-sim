@@ -14,6 +14,52 @@
       <p class="intro">Many cancer cells make energy by fermenting sugar, even with plenty of oxygen around. That is the <b>Warburg effect</b>. Here, a small tumor grows inside healthy tissue, and every cell decides how to make its energy by solving a small linear algebra problem. Pick a question, press Play, and watch.</p>
     </header>
 
+    <section class="card how top" aria-label="How it works">
+      <h2>How it works</h2>
+      <div class="how-grid">
+        <div>
+          <h3>1. Two ways to burn sugar</h3>
+          <p>A cell can <b>respire</b> one glucose using oxygen in its mitochondria: slow to set up, but it makes about <b>32 ATP</b> (energy units). Or it can <b>ferment</b> it: fast and cheap, but only <b>2 ATP</b>, plus 2 lactate (acid) as waste.</p>
+          <svg viewBox="0 0 320 110" class="how-svg" role="img" aria-label="Respiring makes 32 ATP from one glucose; fermenting makes 2 ATP and 2 lactate.">
+            <text x="0" y="16" class="t">respire 1 glucose</text>
+            <rect x="0" y="24" width="300" height="18" rx="4" fill="#534ab7"/><text x="306" y="38" class="t" text-anchor="end" fill="#fff">32 ATP</text>
+            <text x="0" y="70" class="t">ferment 1 glucose</text>
+            <rect x="0" y="78" width="19" height="18" rx="4" fill="#d85a30"/><text x="26" y="92" class="t">2 ATP + 2 lactate (acid)</text>
+          </svg>
+        </div>
+        <div>
+          <h3>2. The cell as a matrix</h3>
+          <p>Write the cell's chemistry as a matrix <b>S</b>: one row per molecule, one column per reaction. A list of reaction speeds <b>v</b> keeps every molecule in balance when <b>Sv = 0</b>. All the balanced choices form the <b>null space</b> of S, and it turns out to be built from exactly two pathways:</p>
+          <p class="vecs"><span style="color:#d85a30">ferment = (1, 1, 0, 2, 0, 2)</span><br><span style="color:#8a82e6">respire = (1, 1, 2, 0, 2, 0)</span></p>
+          <p>So every cell's metabolism is <b>a × ferment + b × respire</b>: a glucose fermented, b respired.</p>
+        </div>
+        <div>
+          <h3>3. Each cell picks the best mix</h3>
+          <p>A cell chooses a and b to make the most ATP within its limits: the glucose it can take in, the oxygen around it, and how much its mitochondria can handle. Biologists call this <b>flux balance analysis</b>. A cell with little oxygen, or small mitochondria, has to ferment.</p>
+        </div>
+        <div>
+          <h3>4. Life on the grid</h3>
+          <p>Capillaries (dark dots) supply oxygen and glucose and wash acid away; everything spreads between squares. Each step, every cell eats and makes ATP. Then it <b>dies</b> if it has too little ATP or too much acid, <b>divides</b> into an empty neighboring square if it has plenty, or otherwise stays.</p>
+        </div>
+        <div>
+          <h3>5. Who wins a free square?</h3>
+          <p>Healthy cells can only grow into empty space. If a tumor cell and a healthy cell both want the same empty square, the tumor wins 3 times out of 4: cancer cells ignore the signals that tell normal cells to stop dividing. Healthy cells <i>can</i> win: they take back space when the tumor dies, and with stronger acid tolerance (Advanced settings) they hold the tumor off.</p>
+        </div>
+        <div class="wide">
+          <h3>6. What it found, and its limits</h3>
+          <p>I ran each question many times with different random seeds, on a 40×40 grid for 200 steps. To tell real evolution from luck, every tumor cell also carried a "marker" trait that mutates the same way but does nothing; a trait that moves much more than the marker is being selected.</p>
+          <ul>
+            <li><b>Acid is the tumor's only way in.</b> With harmless acid the tumor never grows: the tissue is full, and healthy cells never die on their own here. Part of this is built into the rules (cells only grow into empty squares; nothing pushes), so the lesson is about acid as a weapon, not proof that real tumors can't invade otherwise.</li>
+            <li><b>Healthy cells' acid tolerance is the switch.</b> At tolerance 1 the tumor wipes out the tissue every time. At 2 it stays contained at a few dozen cells.</li>
+            <li><b>Evolution pushes tumors away from fermenting.</b> The share of the budget spent on mitochondria rose from 0.5 to about 0.9 every time (the marker moved less than 0.1). Fermenting helps the tumor invade, then its descendants switch to respiring, keeping their acid just under the level they can survive.</li>
+            <li><b>Greedy cells destroy themselves.</b> Cells that always grab the most energy right now poison themselves with their own acid in one step.</li>
+          </ul>
+          <p><b>Why this doesn't match real tumors.</b> Real tumors keep fermenting, so the model is missing something. The leading ideas: tumors evolve resistance to acid (here tolerance is fixed); dividing cells need sugar's <i>carbon</i> as building material, not just energy (here cells only count ATP); tumors physically push into tissue; and blood supply inside tumors is patchy, leaving oxygen-starved cores. Any of these could tip evolution back toward fermenting, and they are good next experiments.</p>
+          <p class="muted">A teaching model: the budget, the cost of mitochondria and the acid tolerances are made-up numbers chosen so the effects are visible. ATP yields (2 and 32) are standard textbook values.</p>
+        </div>
+      </div>
+    </section>
+
     <div class="layout">
       <section class="sim card" aria-label="Simulation">
         <div class="tabs" role="tablist" aria-label="What the map shows">
@@ -51,18 +97,36 @@
             <p class="watch"><b>Watch for:</b> a ring of empty space spreading out ahead of the tumor.</p>
             <div class="qbuttons"><button class="run" data-name="invasion">Run this</button>
             <button class="compare" id="harmless">Compare: make the acid harmless</button></div>
+            <p class="tip"><b>Try the other views:</b> <button class="viewlink" data-view="acid">Acid</button> shows the acid front moving out ahead of the tumor. <button class="viewlink" data-view="oxygen">Oxygen</button> shows the cleared zone filling with oxygen: the tumor isn't short of oxygen; it wins with acid.</p>
+            <details class="seen"><summary>What did I just see?</summary>
+              <p><b>With toxic acid:</b> the tumor ferments about 97% of its sugar and gives off lactate. Wherever the acid passes 1, healthy cells die, opening empty squares that the tumor divides into. By around step 110 every healthy cell is gone. The tumor itself only survives near capillaries, where blood washes its acid away; elsewhere it keeps poisoning itself. This is the <b>acid-mediated invasion</b> idea from cancer research: a tumor clearing space with its own acid.</p>
+              <p><b>With harmless acid:</b> the tumor stays at its starting 9 cells. The tissue is full, nobody dies, so there is never an empty square to grow into.</p>
+              <p><b>What it suggests:</b> two ways to stop this kind of invasion are to neutralize the acid or to help healthy cells tolerate it (try healthy acid tolerance 2 in Advanced settings: the tumor stays contained). Researchers have tested the first idea: in mice, drinking baking soda (bicarbonate) made tumors less acidic and reduced how often they spread<sup><a href="https://pubmed.ncbi.nlm.nih.gov/19276390/" target="_blank" rel="noopener">1</a></sup>. The effect was small and varied between tumor types, and it isn't an approved treatment, so it is a lead rather than a cure.</p>
+            </details>
           </div>
           <div class="question" data-name="evolution">
             <h3>2. Does evolution favor fermenting?</h3>
             <p>Each tumor cell splits a fixed budget between sugar pumps and mitochondria (the cell's respiration machinery). When a tumor cell divides, its daughter's split changes a little at random. Cells whose split works better leave more descendants.</p>
             <p class="watch"><b>Watch for:</b> tumor color shifting from orange (fermenting) to purple (respiring), and the bottom chart.</p>
             <div class="qbuttons"><button class="run" data-name="evolution">Run this</button></div>
+            <p class="tip"><b>Try the <button class="viewlink" data-view="acid">Acid</button> view, and run past step 100.</b> While the tumor spreads, acid rises (more and more tumor cells). Once it has taken over, acid fades as the tumor turns purple: by step 300 each tumor cell makes about 5 times less acid than at the start. <button class="viewlink" data-view="oxygen">Oxygen</button> is lower inside the tumor than in empty space, because respiring cells use it.</p>
+            <details class="seen"><summary>What did I just see?</summary>
+              <p>Every tumor cell splits its budget between sugar pumps and mitochondria. Daughters inherit the split with a small random change. Cells with more mitochondria get more energy out of each sugar (sugar is scarce in crowded tissue) and make less acid, so they survive and divide more. Over about 150 steps the average share spent on mitochondria rises from 50% to about 90%, and the share of sugar fermented falls from about 0.9 to about 0.3 (bottom chart).</p>
+              <p>The early, fermenting tumor still did the damage: its acid cleared out the healthy tissue first. So in this model fermenting is a <b>temporary weapon</b>: useful for invading, then abandoned. The tumor also settles with its acid just under 3, the most it can survive.</p>
+              <p><b>The puzzle:</b> real tumors keep fermenting, so the model is missing something (see "What it found, and its limits" above). <b>What it suggests</b>, as a question rather than a result: if acid mainly helps tumors while they invade, therapies aimed at tumor acid might matter most early on.</p>
+            </details>
           </div>
           <div class="question" data-name="greedy">
             <h3>3. What if tumor cells always grab the fastest energy, no matter the cost?</h3>
             <p>Here every tumor cell re-decides each step how to split its budget, always picking whatever makes the most energy <i>right now</i>. Fermenting is the fastest, so they all switch to it, without "knowing" that their acid builds up around them.</p>
             <p class="watch"><b>Watch for:</b> what happens to the tumor in the first few steps (use Step).</p>
             <div class="qbuttons"><button class="run" data-name="greedy">Run this</button></div>
+            <p class="tip"><b>Try the <button class="viewlink" data-view="acid">Acid</button> view and press Step a few times:</b> a burst of acid appears where the tumor was, then the capillaries wash it away and healthy cells grow back in.</p>
+            <details class="seen"><summary>What did I just see?</summary>
+              <p>The tumor disappears in a single step. Each cell picks pure fermentation because, right now, it gives the most energy (40 ATP versus 35 for a mixed split). But pure fermentation dumps about 8 units of lactate per step onto the cell's own square. The acid there jumps above 5, past the tumor's limit of 3, and every tumor cell dies at once. Healthy cells then grow into the empty space.</p>
+              <p><b>Why it matters:</b> the greedy rule only sees energy; it never "counts" the acid it makes. Evolution in question 2 does count it, because cells that poison themselves leave no descendants. A choice that looks best in the moment can be self-destructive.</p>
+              <p><b>What it suggests:</b> a tumor's own acid is a weak point. Real cancer cells survive their fermentation by pumping lactate out through transporter proteins. Researchers are testing drugs that block one of these pumps (MCT1), so lactate builds up inside the cancer cell; one, AZD3965, was found tolerable in an early human trial<sup><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC7614436/" target="_blank" rel="noopener">2</a></sup>. Our model only tracks acid outside cells, so this is an analogy, not a prediction.</p>
+            </details>
           </div>
         </section>
 
@@ -77,43 +141,6 @@
       </div>
     </div>
 
-    <section class="card how" aria-label="How it works">
-      <h2>How it works</h2>
-      <div class="how-grid">
-        <div>
-          <h3>1. Two ways to burn sugar</h3>
-          <p>A cell can <b>respire</b> one glucose using oxygen in its mitochondria: slow to set up, but it makes about <b>32 ATP</b> (energy units). Or it can <b>ferment</b> it: fast and cheap, but only <b>2 ATP</b>, plus 2 lactate (acid) as waste.</p>
-          <svg viewBox="0 0 320 110" class="how-svg" role="img" aria-label="Respiring makes 32 ATP from one glucose; fermenting makes 2 ATP and 2 lactate.">
-            <text x="0" y="16" class="t">respire 1 glucose</text>
-            <rect x="0" y="24" width="300" height="18" rx="4" fill="#534ab7"/><text x="306" y="38" class="t" text-anchor="end" fill="#fff">32 ATP</text>
-            <text x="0" y="70" class="t">ferment 1 glucose</text>
-            <rect x="0" y="78" width="19" height="18" rx="4" fill="#d85a30"/><text x="26" y="92" class="t">2 ATP + 2 lactate (acid)</text>
-          </svg>
-        </div>
-        <div>
-          <h3>2. The cell as a matrix</h3>
-          <p>Write the cell's chemistry as a matrix <b>S</b>: one row per molecule, one column per reaction. A list of reaction speeds <b>v</b> keeps every molecule in balance when <b>Sv = 0</b>. All the balanced choices form the <b>null space</b> of S, and it turns out to be built from exactly two pathways:</p>
-          <p class="vecs"><span style="color:#d85a30">ferment = (1, 1, 0, 2, 0, 2)</span><br><span style="color:#8a82e6">respire = (1, 1, 2, 0, 2, 0)</span></p>
-          <p>So every cell's metabolism is <b>a × ferment + b × respire</b>: a glucose fermented, b respired.</p>
-        </div>
-        <div>
-          <h3>3. Each cell picks the best mix</h3>
-          <p>A cell chooses a and b to make the most ATP within its limits: the glucose it can take in, the oxygen around it, and how much its mitochondria can handle. Biologists call this <b>flux balance analysis</b>. A cell with little oxygen, or small mitochondria, has to ferment.</p>
-        </div>
-        <div>
-          <h3>4. Life on the grid</h3>
-          <p>Capillaries (dark dots) supply oxygen and glucose and wash acid away; everything spreads between squares. Each step, every cell eats and makes ATP. Then it <b>dies</b> if it has too little ATP or too much acid, <b>divides</b> into an empty neighboring square if it has plenty, or otherwise stays.</p>
-        </div>
-        <div>
-          <h3>5. Who wins a free square?</h3>
-          <p>Healthy cells can only grow into empty space. If a tumor cell and a healthy cell both want the same empty square, the tumor wins 3 times out of 4: cancer cells ignore the signals that tell normal cells to stop dividing. Healthy cells <i>can</i> win: they take back space when the tumor dies, and with stronger acid tolerance (Advanced settings) they hold the tumor off.</p>
-        </div>
-        <div>
-          <h3>6. What it found, and its limits</h3>
-          <p>Tumors here invade only when their acid kills healthy cells. Over generations they evolve <i>away</i> from fermenting. Real tumors keep fermenting, so the model is missing something: maybe evolving acid tolerance, or needing sugar's carbon to build new cells. It is a teaching model with simple, made-up numbers in places.</p>
-        </div>
-      </div>
-    </section>
 
     <details class="card more">
       <summary>Advanced settings</summary>
@@ -133,8 +160,7 @@
         <input type="range" id="weight" min="1" max="5" step="0.5" value="3">
         <p class="help">When a tumor and a healthy cell want the same empty square: the tumor's odds. 1 : 1 is a fair coin.</p>
       </div>
-      <label class="toggle"><input type="checkbox" id="mutation"> <span><b>Evolution on.</b> A dividing tumor cell's daughter gets a slightly different budget split (question 2), or slightly different mitochondria.</span></label>
-      <label class="toggle"><input type="checkbox" id="acid" checked> <span><b>Acid is toxic.</b> Turn off to make lactate harmless to every cell.</span></label>
+      <p class="help">Evolution and harmless acid are set by the questions above.</p>
     </details>
 
     <details class="card more" id="inspectBox">
