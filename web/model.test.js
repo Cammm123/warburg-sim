@@ -226,8 +226,10 @@ section("scenarios");
   // On 30x30 the center (15, 15) is a capillary, so the seed skips it.
   check("30x30 seed skips the central vessel", M.count(M.presetGrid("invasion", 30).grid, M.TUMOR), 8);
   check("preset uses calibrated substeps", params.diffusionSubsteps, 10);
-  const off = M.presetGrid("acidOff", 30);
-  check("acid-off preset turns acid harm off", off.params.acidHarm, false);
+  const off = M.presetGrid("invasion", 30, { acidHarm: false });
+  check("harmless-acid comparison turns acid harm off", off.params.acidHarm, false);
+  check("evolution preset mutates", M.presetGrid("evolution", 30).params.mutationSd, 0.05);
+  check("greedy preset is plastic", M.presetGrid("greedy", 30).params.plastic, true);
   // Healthy tissue alone stays alive (the calibration guard from test_scenarios.py).
   const p = M.calibratedParams();
   let g = M.healthyTissue(12, 12, M.CAPILLARY_SPACING, p);

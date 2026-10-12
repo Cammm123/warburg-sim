@@ -484,13 +484,15 @@ function seedTumor(grid, row, col, radius, maker) {
   }
 }
 
-/** The scenarios from main.py / experiments.py. trait: which mean to chart. */
+/**
+ * The page's three questions (from main.py run 1, run 3 and run 4).
+ * trait: which tumor mean to chart besides the Warburg index (null = none).
+ * The harmless-acid comparison for "invasion" is the acidHarm setting.
+ */
 const PRESETS = {
-  invasion: { label: "Warburg invasion", params: {}, maker: warburgTumorCell, trait: "meanMito" },
-  freeMito: { label: "Free mitochondria evolve", params: { mutationSd: 0.1 }, maker: warburgTumorCell, trait: "meanMito" },
-  budget: { label: "Budget evolution", params: { mutationSd: 0.05 }, maker: () => budgetTumorCell(0.5), trait: "meanShare" },
-  plastic: { label: "Plastic cells", params: { plastic: true }, maker: () => budgetTumorCell(0.5), trait: "meanShare" },
-  acidOff: { label: "Acid off", params: { mutationSd: 0.05, acidHarm: false }, maker: () => budgetTumorCell(0.5), trait: "meanShare" },
+  invasion: { params: {}, maker: warburgTumorCell, trait: null },
+  evolution: { params: { mutationSd: 0.05 }, maker: () => budgetTumorCell(0.5), trait: "meanShare" },
+  greedy: { params: { plastic: true }, maker: () => budgetTumorCell(0.5), trait: "meanShare" },
 };
 
 /** Healthy tissue + 3x3 tumor seed in the middle, for a preset (plus slider overrides). */

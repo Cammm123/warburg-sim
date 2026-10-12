@@ -100,3 +100,33 @@ canvas.plane { display: block; width: 100%; aspect-ratio: 1; }
 .explainer code { font-size: 0.9em; }
 .vec { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.88rem; white-space: nowrap; }
 footer { margin-top: 28px; font-size: 0.85rem; color: var(--muted); }
+
+/* ---- Redesign (2026-10-11): one map with view tabs, question cards, folded extras ---- */
+.tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 10px; }
+.tabs button[aria-selected="true"], .speed button.active { background: var(--accent-soft); border-color: var(--accent); font-weight: 600; }
+.speed { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.speed button { min-height: 36px; padding: 4px 12px; font-size: 0.9rem; }
+.question { padding: 12px 0; border-top: 1px solid var(--line); }
+.question:first-of-type { border-top: none; padding-top: 0; }
+.question h3 { text-transform: none; letter-spacing: 0; font-size: 1rem; color: var(--text); margin: 0 0 6px; }
+.question p { font-size: 0.92rem; margin-bottom: 6px; }
+.question .watch { color: var(--muted); }
+.question.active h3 { color: var(--accent); }
+.qbuttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.qbuttons .run.active, .qbuttons .compare.active { background: var(--accent-soft); border-color: var(--accent); font-weight: 600; }
+.chart-title { font-size: 0.9rem; font-weight: 600; margin: 4px 0 2px; }
+.how { margin-top: 20px; }
+.how-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 8px 24px; }
+.how h3 { text-transform: none; letter-spacing: 0; font-size: 0.98rem; color: var(--text); margin: 10px 0 4px; }
+.how p { font-size: 0.92rem; }
+.how-svg { width: 100%; max-width: 340px; display: block; margin: 4px 0 8px; }
+.how-svg .t { font: 12px system-ui, sans-serif; fill: var(--text); }
+.vecs { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.86rem; }
+details.more { margin-top: 20px; }
+details.more summary { cursor: pointer; font-weight: 600; }
+details.more[open] summary { margin-bottom: 8px; }
+.help { font-size: 0.82rem; color: var(--muted); margin: 2px 0 0; }
+.toggle { align-items: flex-start; }
+.toggle span { font-size: 0.92rem; }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #2c2c2a; margin-right: 6px; vertical-align: -1px; }
+.swatch.outline { background: transparent; border: 1.5px solid #d85a30; }

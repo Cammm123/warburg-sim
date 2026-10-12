@@ -1,22 +1,22 @@
-// app.js - the page: presets, settings, animation loop, charts and the cell
-// inspector. All the science is in model.js; this file only runs and draws it.
+// app.js - the page: three questions, a map with three views, charts, a
+// "how it works" section, and folded-away settings and cell inspector.
+// All the science is in model.js; this file only runs and draws it.
 
 const M = window.WarburgModel;
 const SIZE = 60;
-const CELL_PX = 8;   // the cells canvas is drawn at 8 px per grid square
+const CELL_PX = 8;   // the map is drawn at 8 px per grid square
 
-const PRESET_NOTES = {
-  invasion: "Fermenting tumor, no evolution. Its acid clears the healthy tissue.",
-  freeMito: "Tumor mitochondria mutate and cost nothing. Does fermenting survive?",
-  budget: "Tumors split a protein budget between sugar transporters and mitochondria; the split evolves.",
-  plastic: "Each cell picks its best split every step. Greedy: watch what its acid does.",
-  acidOff: "Budget evolution, but acid is harmless. Can the tumor still invade?",
+const MUTATION_SD = { invasion: 0.1, evolution: 0.05, greedy: 0.05 };
+
+const VIEWS = {
+  cells: "Each square is one cell. Healthy cells are green. Tumor cells are colored by how they make energy: orange = fermenting, purple = respiring.",
+  oxygen: "Oxygen comes out of the capillaries (dark dots) and spreads. Dark blue = plenty, white = none. Hungry cells use it up, so squares far from capillaries run low.",
+  acid: "Lactate is the acid fermenting cells give off. Capillaries wash it away. Healthy cells die where it passes their tolerance (1); tumor cells survive up to 3. Dark brown = 3 or more.",
 };
-const MUTATION_SD = { meanMito: 0.1, meanShare: 0.05 };
 
 const state = {
   preset: "invasion", grid: null, params: null, rng: null, seed: 1, stepCount: 0,
-  playing: false, selected: null,
+  playing: false, selected: null, view: "cells", stepsPerSecond: 6, owed: 0, lastTime: null,
   history: { healthy: [], tumor: [], trait: [], warburg: [] },
 };
 
@@ -30,12 +30,11 @@ function readSettings() {
   };
 }
 
-/** Params overrides from the settings panel, on top of the preset's own. */
+/** Params overrides from the settings, on top of the question's own. */
 function overrides(settings) {
-  const trait = M.PRESETS[state.preset].trait;
   return {
     vesselGlucose: settings.glucose, tumorWeight: settings.weight, acidHarm: settings.acid,
-    mutationSd: settings.mutation ? MUTATION_SD[trait] : 0,
+    mutationSd: settings.mutation ? MUTATION_SD[state.preset] : 0,
   };
 }
 
@@ -44,10 +43,10 @@ function showSettings() {
   $("toleranceOut").textContent = s.tolerance.toFixed(1);
   $("glucoseOut").textContent = s.glucose.toFixed(1);
   $("weightOut").textContent = `${s.weight % 1 ? s.weight.toFixed(1) : s.weight} : 1`;
-  $("speedOut").textContent = `${$("speed").value} step${$("speed").value === "1" ? "" : "s"} / frame`;
+  $("harmless").classList.toggle("active", state.preset === "invasion" && !s.acid);
 }
 
-/** Apply settings to the running simulation (next step uses them). */
+/** Apply settings to the running simulation (the next step uses them). */
 function applySettings() {
   const s = readSettings();
   Object.assign(state.params, overrides(s));
@@ -67,15 +66,18 @@ function startRun() {
   draw();
 }
 
-/** Choose a preset: its own defaults for mutation and acid, other settings back to defaults. */
-function choosePreset(name) {
+/** Choose a question. acidHarmless: question 1's comparison run. */
+function chooseQuestion(name, acidHarmless = false) {
   state.preset = name;
   const preset = M.PRESETS[name];
   $("mutation").checked = (preset.params.mutationSd || 0) > 0;
-  $("acid").checked = preset.params.acidHarm !== false;
+  $("acid").checked = !acidHarmless;
   $("tolerance").value = 1; $("glucose").value = 5; $("weight").value = 3;
-  $("traitName").textContent = preset.trait === "meanShare" ? "mean share of budget on mitochondria" : "mean mitochondrial capacity M";
-  document.querySelectorAll("#presets button").forEach((b) => b.classList.toggle("active", b.dataset.name === name));
+  document.querySelectorAll(".question").forEach((q) => q.classList.toggle("active", q.dataset.name === name));
+  document.querySelectorAll(".run").forEach((b) => b.classList.toggle("active", b.dataset.name === name && !acidHarmless));
+  $("traitCaption").innerHTML = preset.trait
+    ? '<span class="swatch" style="background:#d85a30"></span>share of sugar fermented (0 = all respired, 1 = all fermented) &nbsp; <span class="swatch" style="background:#534ab7"></span>share of the budget spent on mitochondria'
+    : '<span class="swatch" style="background:#d85a30"></span>share of sugar the tumor ferments (0 = all respired, 1 = all fermented)';
   state.seed = 1;
   setPlaying(false);
   startRun();
@@ -83,11 +85,11 @@ function choosePreset(name) {
 
 function record() {
   const s = M.summary(state.grid, state.params);
-  const h = state.history;
+  const h = state.history, trait = M.PRESETS[state.preset].trait;
   h.healthy.push(M.count(state.grid, M.HEALTHY));
   h.tumor.push(M.count(state.grid, M.TUMOR));
-  h.trait.push(s[M.PRESETS[state.preset].trait]);
-  h.warburg.push(s.meanWarburg);
+  h.trait.push(trait ? s[trait] : null);
+  h.warburg.push(M.count(state.grid, M.TUMOR) ? s.meanWarburg : null);
 }
 
 function doStep() {
@@ -98,7 +100,7 @@ function doStep() {
 
 // ---- Drawing ----------------------------------------------------------------------------
 function hexToRgb(hex) { const n = parseInt(hex.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
-const COLORS = { empty: hexToRgb("#f1efe8"), healthy: hexToRgb("#1d9e75"), vessel: hexToRgb("#a32d2d"),
+const COLORS = { empty: hexToRgb("#f1efe8"), healthy: hexToRgb("#1d9e75"), vessel: "#2c2c2a",
                  ferment: hexToRgb("#d85a30"), respire: hexToRgb("#534ab7") };
 const mix = (x, y, t) => x.map((v, i) => Math.round(v + (y[i] - v) * t));
 const rgb = (c) => `rgb(${c[0]},${c[1]},${c[2]})`;
@@ -109,37 +111,54 @@ function cellIndex(r, c) {
   return M.warburgIndex(M.cellFluxes(g.cells[r][c], g.glucose[r][c], g.oxygen[r][c], state.params, state.params.uptakeFraction));
 }
 
-function drawCells() {
-  const canvas = $("cells"), ctx = canvas.getContext("2d"), g = state.grid;
+/** Color of square (r, c) in the current view. */
+function squareColor(r, c) {
+  const g = state.grid, cell = g.cells[r][c];
+  if (state.view === "oxygen") return mix([255, 255, 255], [24, 95, 165], Math.min(g.oxygen[r][c] / state.params.vesselOxygen, 1));
+  if (state.view === "acid") return mix([255, 255, 255], [113, 43, 19], Math.min(g.lactate[r][c] / 3, 1));
+  if (cell.kind === M.HEALTHY) return COLORS.healthy;
+  if (cell.kind === M.TUMOR) return mix(COLORS.respire, COLORS.ferment, cellIndex(r, c));
+  return COLORS.empty;
+}
+
+function drawMap() {
+  const canvas = $("map"), ctx = canvas.getContext("2d"), g = state.grid;
   canvas.width = SIZE * CELL_PX; canvas.height = SIZE * CELL_PX;
   for (let r = 0; r < SIZE; r++) {
     for (let c = 0; c < SIZE; c++) {
-      const cell = g.cells[r][c];
-      let color;
-      if (g.vesselSet.has(r * SIZE + c)) color = COLORS.vessel;
-      else if (cell.kind === M.HEALTHY) color = COLORS.healthy;
-      else if (cell.kind === M.TUMOR) color = mix(COLORS.respire, COLORS.ferment, cellIndex(r, c));
-      else color = COLORS.empty;
-      ctx.fillStyle = rgb(color);
+      ctx.fillStyle = rgb(squareColor(r, c));
       ctx.fillRect(c * CELL_PX, r * CELL_PX, CELL_PX, CELL_PX);
     }
   }
-  if (state.selected) {
+  ctx.fillStyle = COLORS.vessel;          // capillaries: dark dots
+  for (const [r, c] of g.vessels) {
+    ctx.beginPath(); ctx.arc(c * CELL_PX + CELL_PX / 2, r * CELL_PX + CELL_PX / 2, CELL_PX * 0.42, 0, 2 * Math.PI); ctx.fill();
+  }
+  if (state.view !== "cells") {           // outline the tumor so you can see where it is
+    ctx.strokeStyle = "rgba(216, 90, 48, 0.9)"; ctx.lineWidth = 1;
+    for (let r = 0; r < SIZE; r++) for (let c = 0; c < SIZE; c++)
+      if (g.cells[r][c].kind === M.TUMOR) ctx.strokeRect(c * CELL_PX + 0.5, r * CELL_PX + 0.5, CELL_PX - 1, CELL_PX - 1);
+  }
+  if (state.selected && $("inspectBox").open) {
     const [r, c] = state.selected;
-    ctx.lineWidth = 2; ctx.strokeStyle = "#111";   // a tight box on the square's own edge
+    ctx.lineWidth = 2; ctx.strokeStyle = "#111";
     ctx.strokeRect(c * CELL_PX + 1, r * CELL_PX + 1, CELL_PX - 2, CELL_PX - 2);
   }
 }
 
-function drawField(id, field, top, dark) {
-  const ctx = $(id).getContext("2d"), img = ctx.createImageData(SIZE, SIZE);
-  for (let r = 0; r < SIZE; r++) {
-    for (let c = 0; c < SIZE; c++) {
-      const t = Math.min(Math.max(field[r][c] / top, 0), 1), col = mix([255, 255, 255], dark, t);
-      img.data.set([col[0], col[1], col[2], 255], 4 * (r * SIZE + c));
-    }
-  }
-  ctx.putImageData(img, 0, 0);
+function drawLegend() {
+  const legends = {
+    cells: '<span><span class="swatch" style="background:#1d9e75"></span>Healthy</span>' +
+           '<span>Tumor: fermenting<span class="ramp"></span>respiring</span>' +
+           '<span><span class="dot"></span>Capillary</span>' +
+           '<span><span class="swatch" style="background:#f1efe8;border:1px solid #bbb"></span>Empty (a cell died)</span>',
+    oxygen: '<span>No oxygen<span class="ramp" style="background:linear-gradient(90deg,#fff,#185fa5);border:1px solid #bbb"></span>blood level</span>' +
+            '<span><span class="dot"></span>Capillary</span><span><span class="swatch outline"></span>Tumor cell</span>',
+    acid: '<span>No acid<span class="ramp" style="background:linear-gradient(90deg,#fff,#712b13);border:1px solid #bbb"></span>3 or more</span>' +
+          '<span><span class="dot"></span>Capillary</span><span><span class="swatch outline"></span>Tumor cell</span>',
+  };
+  $("legend").innerHTML = legends[state.view];
+  $("viewCaption").textContent = VIEWS[state.view];
 }
 
 /** A crisp canvas at the device's pixel ratio; returns its context and CSS size. */
@@ -153,23 +172,28 @@ function setupCanvas(canvas) {
 
 const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
-function drawChart(id, series, top) {
+/** Line chart; values may contain null (gap). yLabel goes at the top of the axis. */
+function drawChart(id, series, top, yLabel) {
   const { ctx, w, h } = setupCanvas($(id));
-  const left = 38, right = 8, upper = 8, lower = 18, pw = w - left - right, ph = h - upper - lower;
+  const left = 42, right = 8, upper = 14, lower = 18, pw = w - left - right, ph = h - upper - lower;
   ctx.clearRect(0, 0, w, h);
   ctx.strokeStyle = cssVar("--line"); ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(left, upper); ctx.lineTo(left, upper + ph); ctx.lineTo(left + pw, upper + ph); ctx.stroke();
   ctx.fillStyle = cssVar("--muted"); ctx.font = "11px system-ui, sans-serif"; ctx.textAlign = "right";
-  ctx.fillText(top >= 10 ? Math.round(top) : top.toFixed(2), left - 4, upper + 8);
+  ctx.fillText(top >= 10 ? Math.round(top) : top.toFixed(1), left - 4, upper + 8);
   ctx.fillText("0", left - 4, upper + ph);
+  ctx.textAlign = "left"; ctx.fillText(yLabel, left + 4, upper - 3);
   const n = Math.max(...series.map((s) => s.values.length));
-  ctx.textAlign = "left"; ctx.fillText("step 0", left, h - 4);
+  ctx.fillText("step 0", left, h - 4);
   ctx.textAlign = "right"; ctx.fillText(`step ${n - 1}`, left + pw, h - 4);
   for (const s of series) {
     ctx.strokeStyle = s.color; ctx.lineWidth = 2; ctx.beginPath();
+    let pen = false;
     s.values.forEach((v, i) => {
+      if (v === null) { pen = false; return; }
       const x = left + (n > 1 ? (pw * i) / (n - 1) : 0), y = upper + ph * (1 - v / top);
-      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      if (pen) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+      pen = true;
     });
     ctx.stroke();
   }
@@ -177,20 +201,19 @@ function drawChart(id, series, top) {
 
 function drawCharts() {
   const h = state.history, living = SIZE * SIZE - state.grid.vessels.length;
-  drawChart("countsChart", [{ values: h.healthy, color: "#1d9e75" }, { values: h.tumor, color: "#d85a30" }], living);
-  const top = Math.max(1, ...h.trait);
-  drawChart("traitChart", [{ values: h.warburg, color: "#d85a30" }, { values: h.trait, color: "#534ab7" }], top);
+  drawChart("countsChart", [{ values: h.healthy, color: "#1d9e75" }, { values: h.tumor, color: "#d85a30" }], living, "cells");
+  const series = [{ values: h.warburg, color: "#d85a30" }];
+  if (M.PRESETS[state.preset].trait) series.push({ values: h.trait, color: "#534ab7" });
+  drawChart("traitChart", series, 1, "share (0 to 1)");
 }
 
 function draw() {
-  drawCells();
-  drawField("oxygen", state.grid.oxygen, state.params.vesselOxygen, [24, 95, 165]);
-  drawField("lactate", state.grid.lactate, 4, [153, 60, 29]);
+  drawMap();
   $("step").textContent = state.stepCount;
   $("healthy").textContent = M.count(state.grid, M.HEALTHY);
   $("tumor").textContent = M.count(state.grid, M.TUMOR);
   drawCharts();
-  drawInspector();
+  if ($("inspectBox").open) drawInspector();
 }
 
 // ---- Cell inspector ------------------------------------------------------------------------
@@ -295,36 +318,52 @@ function drawInspector() {
 // ---- Wiring --------------------------------------------------------------------------------
 function setPlaying(on) {
   state.playing = on;
+  state.lastTime = null; state.owed = 0;
   $("play").textContent = on ? "Pause" : "Play";
 }
 
-function frame() {
+/** Runs about stepsPerSecond steps each second, however fast the screen refreshes. */
+function frame(time) {
   if (state.playing) {
-    for (let i = 0; i < +$("speed").value; i++) doStep();
-    draw();
-    if (M.count(state.grid, M.TUMOR) === 0) setPlaying(false);
+    if (state.lastTime !== null) state.owed += ((time - state.lastTime) / 1000) * state.stepsPerSecond;
+    state.lastTime = time;
+    const steps = Math.min(Math.floor(state.owed), 4);
+    if (steps > 0) {
+      state.owed -= steps;
+      for (let i = 0; i < steps; i++) doStep();
+      draw();
+      if (M.count(state.grid, M.TUMOR) === 0) setPlaying(false);
+    }
   }
   requestAnimationFrame(frame);
 }
 
 function init() {
-  $("presets").innerHTML = Object.entries(M.PRESETS).map(([name, p]) =>
-    `<div class="preset"><button data-name="${name}">${p.label}</button><span>${PRESET_NOTES[name]}</span></div>`).join("");
-  document.querySelectorAll("#presets button").forEach((b) => b.addEventListener("click", () => choosePreset(b.dataset.name)));
+  document.querySelectorAll(".run").forEach((b) => b.addEventListener("click", () => chooseQuestion(b.dataset.name)));
+  $("harmless").addEventListener("click", () => chooseQuestion("invasion", true));
   $("play").addEventListener("click", () => setPlaying(!state.playing));
   $("stepBtn").addEventListener("click", () => { setPlaying(false); doStep(); draw(); });
   $("reset").addEventListener("click", () => { state.seed++; setPlaying(false); startRun(); });
   ["tolerance", "glucose", "weight", "mutation", "acid"].forEach((id) => $(id).addEventListener("input", applySettings));
-  $("speed").addEventListener("input", showSettings);
-  $("cells").addEventListener("click", (e) => {
+  document.querySelectorAll(".speed button").forEach((b) => b.addEventListener("click", () => {
+    state.stepsPerSecond = +b.dataset.speed;
+    document.querySelectorAll(".speed button").forEach((x) => x.classList.toggle("active", x === b));
+  }));
+  document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => {
+    state.view = b.dataset.view;
+    document.querySelectorAll(".tabs button").forEach((x) => x.setAttribute("aria-selected", String(x === b)));
+    drawLegend(); draw();
+  }));
+  $("map").addEventListener("click", (e) => {
     const rect = e.target.getBoundingClientRect();
     const c = Math.floor(((e.clientX - rect.left) / rect.width) * SIZE), r = Math.floor(((e.clientY - rect.top) / rect.height) * SIZE);
-    if (r >= 0 && r < SIZE && c >= 0 && c < SIZE) { state.selected = [r, c]; draw(); }
+    if (r >= 0 && r < SIZE && c >= 0 && c < SIZE) { state.selected = [r, c]; $("inspectBox").open = true; draw(); }
   });
-  window.addEventListener("resize", () => { drawCharts(); drawInspector(); });
-  choosePreset("invasion");
+  $("inspectBox").addEventListener("toggle", draw);
+  window.addEventListener("resize", draw);
   state.selected = [SIZE / 2, SIZE / 2];
-  draw();
+  drawLegend();
+  chooseQuestion("invasion");
   requestAnimationFrame(frame);
 }
 

@@ -4,104 +4,150 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Warburg Simulation</title>
-  <meta name="description" content="A tumor on a grid where every cell solves a tiny linear-algebra problem: does fermenting (the Warburg effect) win?">
+  <meta name="description" content="A tumor on a grid where every cell solves a tiny linear-algebra problem to decide how to make energy. Does fermenting (the Warburg effect) win?">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="page">
     <header>
-      <h1>The Warburg effect, one linear-algebra problem per cell</h1>
-      <p class="intro">Every cell on this grid decides how to burn its sugar by solving a small linear-algebra problem. Tumor cells that ferment make acid, which kills their healthy neighbors. Does fermenting win?</p>
+      <h1>Why do tumors ferment sugar?</h1>
+      <p class="intro">Many cancer cells make energy by fermenting sugar, even with plenty of oxygen around. That is the <b>Warburg effect</b>. Here, a small tumor grows inside healthy tissue, and every cell decides how to make its energy by solving a small linear algebra problem. Pick a question, press Play, and watch.</p>
     </header>
 
     <div class="layout">
       <section class="sim card" aria-label="Simulation">
-        <canvas id="cells" class="grid" width="60" height="60" aria-label="Tissue grid. Click a cell to inspect it."></canvas>
-        <div class="legend">
-          <span><span class="swatch" style="background:#1d9e75"></span>Healthy</span>
-          <span>Tumor: fermenting<span class="ramp"></span>respiring</span>
-          <span><span class="swatch" style="background:#a32d2d"></span>Blood vessel</span>
-          <span><span class="swatch" style="background:#f1efe8;border:1px solid #ccc"></span>Empty</span>
+        <div class="tabs" role="tablist" aria-label="What the map shows">
+          <button role="tab" data-view="cells" aria-selected="true">Cells</button>
+          <button role="tab" data-view="oxygen" aria-selected="false">Oxygen</button>
+          <button role="tab" data-view="acid" aria-selected="false">Acid</button>
         </div>
+        <canvas id="map" class="grid" width="480" height="480" aria-label="The tissue. Click a cell to inspect it."></canvas>
+        <p class="caption" id="viewCaption"></p>
+        <div class="legend" id="legend"></div>
         <div class="stats">
           <span>Step <b id="step">0</b></span>
-          <span>Healthy <b id="healthy">0</b></span>
-          <span>Tumor <b id="tumor">0</b></span>
+          <span><span class="swatch" style="background:#1d9e75"></span>Healthy <b id="healthy">0</b></span>
+          <span><span class="swatch" style="background:#d85a30"></span>Tumor <b id="tumor">0</b></span>
         </div>
         <div class="buttons">
           <button id="play">Play</button>
           <button id="stepBtn">Step</button>
-          <button id="reset">Reset</button>
+          <button id="reset">Restart</button>
         </div>
-        <div class="slider">
-          <label for="speed">Speed <b id="speedOut">2 steps / frame</b></label>
-          <input type="range" id="speed" min="1" max="6" step="1" value="2">
-        </div>
-        <div class="fields">
-          <div><canvas id="oxygen" class="grid" width="60" height="60" aria-label="Oxygen"></canvas><div class="caption">Oxygen (white = none, blue = blood level)</div></div>
-          <div><canvas id="lactate" class="grid" width="60" height="60" aria-label="Lactate"></canvas><div class="caption">Lactate, the acid (white = none, brown = deadly)</div></div>
+        <div class="speed" role="radiogroup" aria-label="Speed">
+          <span class="muted">Speed</span>
+          <button data-speed="2">Slow</button>
+          <button data-speed="6" class="active">Normal</button>
+          <button data-speed="20">Fast</button>
         </div>
       </section>
 
       <div class="side">
-        <section class="card" aria-label="Scenarios">
-          <h2>Scenarios</h2>
-          <div id="presets"></div>
-        </section>
-
-        <section class="card" aria-label="Settings">
-          <h2>Settings <span class="muted">(take effect on the next step)</span></h2>
-          <div class="slider">
-            <label for="tolerance">Healthy cells' acid tolerance <b id="toleranceOut">1.0</b></label>
-            <input type="range" id="tolerance" min="0.5" max="4" step="0.1" value="1">
+        <section class="card" aria-label="Questions">
+          <h2>Pick a question</h2>
+          <div class="question" data-name="invasion">
+            <h3>1. Can a tumor's acid clear out healthy tissue?</h3>
+            <p>These tumor cells ferment almost all their sugar and give off lactate, an acid. Healthy cells die in strong acid; tumor cells can take three times more.</p>
+            <p class="watch"><b>Watch for:</b> a ring of empty space spreading out ahead of the tumor.</p>
+            <div class="qbuttons"><button class="run" data-name="invasion">Run this</button>
+            <button class="compare" id="harmless">Compare: make the acid harmless</button></div>
           </div>
-          <div class="slider">
-            <label for="glucose">Blood glucose <b id="glucoseOut">5.0</b></label>
-            <input type="range" id="glucose" min="2" max="10" step="0.5" value="5">
+          <div class="question" data-name="evolution">
+            <h3>2. Does evolution favor fermenting?</h3>
+            <p>Each tumor cell splits a fixed budget between sugar pumps and mitochondria (the cell's respiration machinery). When a tumor cell divides, its daughter's split changes a little at random. Cells whose split works better leave more descendants.</p>
+            <p class="watch"><b>Watch for:</b> tumor color shifting from orange (fermenting) to purple (respiring), and the bottom chart.</p>
+            <div class="qbuttons"><button class="run" data-name="evolution">Run this</button></div>
           </div>
-          <div class="slider">
-            <label for="weight">Tumor advantage in space contests <b id="weightOut">3 : 1</b></label>
-            <input type="range" id="weight" min="1" max="5" step="0.5" value="3">
+          <div class="question" data-name="greedy">
+            <h3>3. What if tumor cells always grab the fastest energy, no matter the cost?</h3>
+            <p>Here every tumor cell re-decides each step how to split its budget, always picking whatever makes the most energy <i>right now</i>. Fermenting is the fastest, so they all switch to it, without "knowing" that their acid builds up around them.</p>
+            <p class="watch"><b>Watch for:</b> what happens to the tumor in the first few steps (use Step).</p>
+            <div class="qbuttons"><button class="run" data-name="greedy">Run this</button></div>
           </div>
-          <label class="toggle"><input type="checkbox" id="mutation"> Tumor cells mutate when they divide</label>
-          <label class="toggle"><input type="checkbox" id="acid" checked> Acid can kill cells</label>
         </section>
 
         <section class="card" aria-label="Charts">
-          <h2>Over time</h2>
+          <h2>What is happening</h2>
+          <p class="chart-title">How many cells of each kind</p>
           <canvas id="countsChart" class="chart" aria-label="Healthy and tumor cell counts over time"></canvas>
-          <div class="caption"><span class="swatch" style="background:#1d9e75"></span>healthy cells &nbsp; <span class="swatch" style="background:#d85a30"></span>tumor cells</div>
-          <canvas id="traitChart" class="chart" style="margin-top:12px" aria-label="Tumor traits over time"></canvas>
-          <div class="caption"><span class="swatch" style="background:#d85a30"></span>Warburg index (share of sugar fermented, 0 to 1) &nbsp; <span class="swatch" style="background:#534ab7"></span><span id="traitName">mitochondria</span></div>
-        </section>
-
-        <section class="card" aria-label="Cell inspector">
-          <h2>Inspect a cell</h2>
-          <p class="muted" id="inspectHint">Click any cell on the grid to see the linear-algebra problem it is solving.</p>
-          <div class="inspect-grid" id="inspect" hidden>
-            <dl class="kv" id="inspectValues"></dl>
-            <div><canvas id="plane" class="plane" width="300" height="300" aria-label="The cell as a point in the null space"></canvas>
-            <div class="caption">The cell as a point (a, b) in the null space: a = sugar fermented, b = sugar respired, per step. Lines are its limits.</div></div>
-          </div>
-        </section>
-
-        <section class="card explainer" aria-label="How it works">
-          <h3>What you are looking at</h3>
-          <p>Healthy tissue (green) is fed by capillaries (red dots) that supply oxygen and glucose and carry acid away. A small tumor starts in the middle. Each step, every cell eats, makes energy (ATP), and then dies (too little ATP, or too much acid), stays, or divides into an empty neighboring square.</p>
-          <h3>Every cell solves Sv = 0</h3>
-          <p>A cell's chemistry is a matrix <b>S</b>: one row per molecule (glucose, pyruvate, NAD⁺, NADH, lactate), one column per reaction. A flux vector <b>v</b> says how fast each reaction runs, and a cell in balance needs <b>Sv = 0</b>. The solutions are the <b>null space</b> of S. Row reduction shows it is two-dimensional, with a whole-number basis of two pathways:</p>
-          <p><span class="vec">ferment = (1, 1, 0, 2, 0, 2)</span>: 1 glucose → 2 lactate, 2 ATP<br><span class="vec">respire = (1, 1, 2, 0, 2, 0)</span>: 1 glucose → CO₂, 32 ATP, uses 6 O₂</p>
-          <p>So every cell is a point <b>a·ferment + b·respire</b>, and it picks the a and b that make the most ATP within its limits (glucose, oxygen, mitochondria). That is flux balance analysis, a standard tool in computational biology. Click a cell to see its point.</p>
-          <h3>The budget</h3>
-          <p>In the budget scenarios, a tumor cell has a fixed protein budget to split between glucose transporters (cost 1 each) and mitochondria (cost 10 each). Fermenting is cheap per ATP made; respiring is efficient per glucose. When sugar is plentiful, fermenting can win; when it is scarce, respiring wins.</p>
-          <h3>What the experiments found</h3>
-          <p>In this model the tumor can only invade if its acid kills healthy cells, and the healthy cells' acid tolerance decides whether it does. Evolution never favored more fermenting: tumors ferment to invade, then their descendants drift back toward respiring. Real tumors keep fermenting, so the model is missing something. Likely candidates: evolving acid tolerance, needing glucose carbon to build new cells, or physically pushing into tissue.</p>
-          <h3>Caveats</h3>
-          <p class="muted">A teaching model. Budget, mitochondria cost and acid tolerances are placeholder numbers; ATP yields are textbook values. Built by Cam Kani with Claude, ported from a tested Python model.</p>
+          <p class="chart-title" style="margin-top:14px">How much the tumor ferments</p>
+          <canvas id="traitChart" class="chart" aria-label="How much the tumor ferments over time"></canvas>
+          <p class="caption" id="traitCaption"></p>
         </section>
       </div>
     </div>
-    <footer>Warburg simulation · grid 60×60 · each cell runs flux balance analysis every step.</footer>
+
+    <section class="card how" aria-label="How it works">
+      <h2>How it works</h2>
+      <div class="how-grid">
+        <div>
+          <h3>1. Two ways to burn sugar</h3>
+          <p>A cell can <b>respire</b> one glucose using oxygen in its mitochondria: slow to set up, but it makes about <b>32 ATP</b> (energy units). Or it can <b>ferment</b> it: fast and cheap, but only <b>2 ATP</b>, plus 2 lactate (acid) as waste.</p>
+          <svg viewBox="0 0 320 110" class="how-svg" role="img" aria-label="Respiring makes 32 ATP from one glucose; fermenting makes 2 ATP and 2 lactate.">
+            <text x="0" y="16" class="t">respire 1 glucose</text>
+            <rect x="0" y="24" width="300" height="18" rx="4" fill="#534ab7"/><text x="306" y="38" class="t" text-anchor="end" fill="#fff">32 ATP</text>
+            <text x="0" y="70" class="t">ferment 1 glucose</text>
+            <rect x="0" y="78" width="19" height="18" rx="4" fill="#d85a30"/><text x="26" y="92" class="t">2 ATP + 2 lactate (acid)</text>
+          </svg>
+        </div>
+        <div>
+          <h3>2. The cell as a matrix</h3>
+          <p>Write the cell's chemistry as a matrix <b>S</b>: one row per molecule, one column per reaction. A list of reaction speeds <b>v</b> keeps every molecule in balance when <b>Sv = 0</b>. All the balanced choices form the <b>null space</b> of S, and it turns out to be built from exactly two pathways:</p>
+          <p class="vecs"><span style="color:#d85a30">ferment = (1, 1, 0, 2, 0, 2)</span><br><span style="color:#8a82e6">respire = (1, 1, 2, 0, 2, 0)</span></p>
+          <p>So every cell's metabolism is <b>a × ferment + b × respire</b>: a glucose fermented, b respired.</p>
+        </div>
+        <div>
+          <h3>3. Each cell picks the best mix</h3>
+          <p>A cell chooses a and b to make the most ATP within its limits: the glucose it can take in, the oxygen around it, and how much its mitochondria can handle. Biologists call this <b>flux balance analysis</b>. A cell with little oxygen, or small mitochondria, has to ferment.</p>
+        </div>
+        <div>
+          <h3>4. Life on the grid</h3>
+          <p>Capillaries (dark dots) supply oxygen and glucose and wash acid away; everything spreads between squares. Each step, every cell eats and makes ATP. Then it <b>dies</b> if it has too little ATP or too much acid, <b>divides</b> into an empty neighboring square if it has plenty, or otherwise stays.</p>
+        </div>
+        <div>
+          <h3>5. Who wins a free square?</h3>
+          <p>Healthy cells can only grow into empty space. If a tumor cell and a healthy cell both want the same empty square, the tumor wins 3 times out of 4: cancer cells ignore the signals that tell normal cells to stop dividing. Healthy cells <i>can</i> win: they take back space when the tumor dies, and with stronger acid tolerance (Advanced settings) they hold the tumor off.</p>
+        </div>
+        <div>
+          <h3>6. What it found, and its limits</h3>
+          <p>Tumors here invade only when their acid kills healthy cells. Over generations they evolve <i>away</i> from fermenting. Real tumors keep fermenting, so the model is missing something: maybe evolving acid tolerance, or needing sugar's carbon to build new cells. It is a teaching model with simple, made-up numbers in places.</p>
+        </div>
+      </div>
+    </section>
+
+    <details class="card more">
+      <summary>Advanced settings</summary>
+      <p class="muted">Changes apply on the next step. Restart to begin again with them.</p>
+      <div class="slider">
+        <label for="tolerance">Healthy cells' acid tolerance <b id="toleranceOut">1.0</b></label>
+        <input type="range" id="tolerance" min="0.5" max="4" step="0.1" value="1">
+        <p class="help">Healthy cells die when acid around them goes above this. Tumor cells die above 3.</p>
+      </div>
+      <div class="slider">
+        <label for="glucose">Sugar in the blood <b id="glucoseOut">5.0</b></label>
+        <input type="range" id="glucose" min="2" max="10" step="0.5" value="5">
+        <p class="help">The glucose level the capillaries supply. Lower means cells compete for sugar.</p>
+      </div>
+      <div class="slider">
+        <label for="weight">Tumor advantage for free squares <b id="weightOut">3 : 1</b></label>
+        <input type="range" id="weight" min="1" max="5" step="0.5" value="3">
+        <p class="help">When a tumor and a healthy cell want the same empty square: the tumor's odds. 1 : 1 is a fair coin.</p>
+      </div>
+      <label class="toggle"><input type="checkbox" id="mutation"> <span><b>Evolution on.</b> A dividing tumor cell's daughter gets a slightly different budget split (question 2), or slightly different mitochondria.</span></label>
+      <label class="toggle"><input type="checkbox" id="acid" checked> <span><b>Acid is toxic.</b> Turn off to make lactate harmless to every cell.</span></label>
+    </details>
+
+    <details class="card more" id="inspectBox">
+      <summary>Inspect a cell</summary>
+      <p class="muted" id="inspectHint">Click any square on the map to see the linear algebra problem that cell is solving.</p>
+      <div class="inspect-grid" id="inspect" hidden>
+        <dl class="kv" id="inspectValues"></dl>
+        <div><canvas id="plane" class="plane" width="300" height="300" aria-label="The cell as a point in the null space"></canvas>
+        <p class="caption">The cell as a point (a, b): a = sugar fermented, b = sugar respired, per step. Dashed lines are its limits; the shaded area is everything it could choose.</p></div>
+      </div>
+    </details>
+
+    <footer>Built by Cam Kani with Claude, ported from a tested Python model. Grid 60×60; every cell runs flux balance analysis every step.</footer>
   </div>
   <script src="model.js"></script>
   <script src="app.js"></script>
