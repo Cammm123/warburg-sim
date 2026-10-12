@@ -2,7 +2,7 @@
 
 A grid simulation where every cell runs a tiny flux balance analysis (FBA) and
 lactate spreads as acid. Question: do fermenting ("Warburg") tumor cells win by
-selection? Full plan and build order: `PLAN.md`. Status: `claude-config/memory/research/warburg-sim.md`.
+selection? Full plan and build order: `PLAN.md`. Status: `claude-config/memory/research/warburg-sim/INDEX.md`.
 
 ## How I like to work
 
