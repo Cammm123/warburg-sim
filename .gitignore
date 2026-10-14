@@ -1,0 +1,10 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+
+# Run outputs (regenerate with: python3 main.py)
+output/run*/
+
+# macOS
+.DS_Store
