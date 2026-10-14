@@ -6,7 +6,7 @@ selection? Full plan and build order: `PLAN.md`. Status: `claude-config/memory/r
 
 ## How I like to work
 
-Same as `02-120/spatial-games/CLAUDE.md`:
+Same as `cmu/02-120/spatial-games/CLAUDE.md`:
 
 - **One idea at a time.** One function or change per step; I understand it before we move on.
 - **Never hand me code I can't verify.** Each piece comes with a plain-English
